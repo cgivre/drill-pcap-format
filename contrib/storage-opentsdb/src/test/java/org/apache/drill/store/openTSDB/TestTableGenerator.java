@@ -17,11 +17,14 @@
 package org.apache.drill.store.openTSDB;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 class TestTableGenerator {
 
@@ -36,9 +39,8 @@ class TestTableGenerator {
   static void setupTestData() throws Exception {
     setupSocketConnection();
     String pathToFile = getPathToTestFile();
-
-    File fin = new File(pathToFile);
-    BufferedReader br = new BufferedReader(new FileReader(fin));
+    InputStreamReader reader = new InputStreamReader(new FileInputStream(pathToFile), UTF_8);
+    BufferedReader br = new BufferedReader(reader);
     readAndSendDataToDB(br);
   }
 
@@ -48,7 +50,8 @@ class TestTableGenerator {
 
   private static void setupSocketConnection() throws IOException {
     socket = new Socket(HOSTNAME, PORT);
-    pw = new PrintWriter(socket.getOutputStream(), true);
+    OutputStreamWriter stream = new OutputStreamWriter(socket.getOutputStream(), UTF_8);
+    pw = new PrintWriter(stream, true);
   }
 
   private static void readAndSendDataToDB(BufferedReader br) throws IOException {

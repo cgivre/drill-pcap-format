@@ -37,22 +37,27 @@ public class TestOpenTSDBPlugin extends BaseTestQuery {
 
   @Test
   public void testBasicQueryFROMWithTableName() throws Exception {
-    base.runSQLVerifyCount("select * from openTSDB.`warp.speed.test`", 14);
+    base.runSQLVerifyCount("select * from openTSDB.`warp.speed.test`", 17);
   }
 
   @Test
   public void testBasicQueryFROMWithRequiredParams() throws Exception {
-    base.runSQLVerifyCount("select * from openTSDB.`(metric=warp.speed.test)`", 14);
+    base.runSQLVerifyCount("select * from openTSDB.`(metric=warp.speed.test)`", 17);
   }
 
   @Test
   public void testBasicQueryFROMWithParameters() throws Exception {
-    test("select * from openTSDB.`(metric=warp.speed.test, aggregator=sum)`;");
+    base.runSQLVerifyCount("select * from openTSDB.`(metric=warp.speed.test, aggregator=avg)`", 17);
+  }
+
+  @Test
+  public void testBasicQueryGROUPBY() throws Exception {
+    base.runSQLVerifyCount("select `timestamp`, sum(`aggregated value`) from openTSDB.`(metric=warp.speed.test, aggregator=sum)` group by `timestamp`", 15);
   }
 
   @Test
   public void testBasicQueryFROMWithInterpolationParam() throws Exception {
-    base.runSQLVerifyCount("select * from openTSDB.`(metric=warp.speed.test, downsample=5m-avg )`", 14);
+    base.runSQLVerifyCount("select * from openTSDB.`(metric=warp.speed.test, downsample=5y-avg)`", 4);
   }
 
   @Test(expected = UserRemoteException.class)
