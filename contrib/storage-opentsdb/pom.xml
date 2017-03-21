@@ -18,20 +18,15 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <artifactId>drill-contrib-parent</artifactId>
         <groupId>org.apache.drill.contrib</groupId>
-        <version>1.10.0-SNAPSHOT</version>
+        <version>1.11.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>drill-opentsdb-storage</artifactId>
 
     <name>contrib/opentsdb-storage-plugin</name>
-
-    <properties>
-        <drill.version>1.3.0</drill.version>
-    </properties>
 
     <dependencies>
         <dependency>
