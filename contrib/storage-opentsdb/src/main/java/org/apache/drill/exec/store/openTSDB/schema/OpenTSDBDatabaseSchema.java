@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,6 @@ package org.apache.drill.exec.store.openTSDB.schema;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.store.AbstractSchema;
@@ -29,8 +28,9 @@ import org.apache.drill.exec.store.openTSDB.schema.OpenTSDBSchemaFactory.OpenTSD
 import java.util.Map;
 import java.util.Set;
 
-@Slf4j
 public class OpenTSDBDatabaseSchema extends AbstractSchema {
+
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OpenTSDBDatabaseSchema.class);
 
   private final OpenTSDBTables schema;
   private final Set<String> tableNames;
@@ -46,7 +46,7 @@ public class OpenTSDBDatabaseSchema extends AbstractSchema {
 
   @Override
   public Table getTable(String tableName) {
-    if (isTableExist(tableName)) { // table does not exist
+    if (isTableExist(tableName)) {
       return null;
     }
 
@@ -55,11 +55,11 @@ public class OpenTSDBDatabaseSchema extends AbstractSchema {
     }
 
     return drillTables.get(tableName);
-
   }
 
-  private boolean isTableExist(String tableName) {
-    return !tableNames.contains(tableName);
+  @Override
+  public String getTypeName() {
+    return OpenTSDBStoragePluginConfig.NAME;
   }
 
   @Override
@@ -67,9 +67,8 @@ public class OpenTSDBDatabaseSchema extends AbstractSchema {
     return tableNames;
   }
 
-  @Override
-  public String getTypeName() {
-    return OpenTSDBStoragePluginConfig.NAME;
+  private boolean isTableExist(String tableName) {
+    return !tableNames.contains(tableName);
   }
 
 }

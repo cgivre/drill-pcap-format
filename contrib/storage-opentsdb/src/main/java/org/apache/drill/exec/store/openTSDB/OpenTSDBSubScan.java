@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
@@ -38,16 +37,17 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-@Slf4j
 @JsonTypeName("openTSDB-tablet-scan")
 public class OpenTSDBSubScan extends AbstractBase implements SubScan {
+
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OpenTSDBSubScan.class);
 
   @JsonProperty
   public final OpenTSDBStoragePluginConfig storage;
 
+  private final List<SchemaPath> columns;
   private final OpenTSDBStoragePlugin openTSDBStoragePlugin;
   private final List<OpenTSDBSubScanSpec> tabletScanSpecList;
-  private final List<SchemaPath> columns;
 
   @JsonCreator
   public OpenTSDBSubScan(@JacksonInject StoragePluginRegistry registry,
@@ -70,17 +70,9 @@ public class OpenTSDBSubScan extends AbstractBase implements SubScan {
     this.columns = columns;
   }
 
-  public List<OpenTSDBSubScanSpec> getTabletScanSpecList() {
-    return tabletScanSpecList;
-  }
-
-  @JsonIgnore
-  public OpenTSDBStoragePluginConfig getStorageConfig() {
-    return storage;
-  }
-
-  public List<SchemaPath> getColumns() {
-    return columns;
+  @Override
+  public int getOperatorType() {
+    return 0;
   }
 
   @Override
@@ -88,9 +80,15 @@ public class OpenTSDBSubScan extends AbstractBase implements SubScan {
     return false;
   }
 
-  @JsonIgnore
-  public OpenTSDBStoragePlugin getStorageEngine() {
-    return openTSDBStoragePlugin;
+  @Override
+  public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
+    Preconditions.checkArgument(children.isEmpty());
+    return new OpenTSDBSubScan(openTSDBStoragePlugin, storage, tabletScanSpecList, columns);
+  }
+
+  @Override
+  public Iterator<PhysicalOperator> iterator() {
+    return Collections.emptyIterator();
   }
 
   @Override
@@ -98,21 +96,22 @@ public class OpenTSDBSubScan extends AbstractBase implements SubScan {
     return physicalVisitor.visitSubScan(this, value);
   }
 
-  @Override
-  public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
-    Preconditions.checkArgument(children.isEmpty());
-    return new OpenTSDBSubScan(openTSDBStoragePlugin, storage, tabletScanSpecList, columns);
-
+  public List<SchemaPath> getColumns() {
+    return columns;
   }
 
-  @Override
-  public int getOperatorType() {
-    return 0;
+  public List<OpenTSDBSubScanSpec> getTabletScanSpecList() {
+    return tabletScanSpecList;
   }
 
-  @Override
-  public Iterator<PhysicalOperator> iterator() {
-    return Collections.emptyIterator();
+  @JsonIgnore
+  public OpenTSDBStoragePlugin getStorageEngine() {
+    return openTSDBStoragePlugin;
+  }
+
+  @JsonIgnore
+  public OpenTSDBStoragePluginConfig getStorageConfig() {
+    return storage;
   }
 
   public static class OpenTSDBSubScanSpec {
