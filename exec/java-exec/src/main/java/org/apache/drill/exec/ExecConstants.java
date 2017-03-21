@@ -63,17 +63,35 @@ public interface ExecConstants {
   String SPOOLING_BUFFER_DELETE = "drill.exec.buffer.spooling.delete";
   String SPOOLING_BUFFER_MEMORY = "drill.exec.buffer.spooling.size";
   String BATCH_PURGE_THRESHOLD = "drill.exec.sort.purge.threshold";
-  String EXTERNAL_SORT_TARGET_BATCH_SIZE = "drill.exec.sort.external.batch.size";
+
+  // External Sort Boot configuration
+
   String EXTERNAL_SORT_TARGET_SPILL_BATCH_SIZE = "drill.exec.sort.external.spill.batch.size";
   String EXTERNAL_SORT_SPILL_GROUP_SIZE = "drill.exec.sort.external.spill.group.size";
   String EXTERNAL_SORT_SPILL_THRESHOLD = "drill.exec.sort.external.spill.threshold";
   String EXTERNAL_SORT_SPILL_DIRS = "drill.exec.sort.external.spill.directories";
   String EXTERNAL_SORT_SPILL_FILESYSTEM = "drill.exec.sort.external.spill.fs";
+  String EXTERNAL_SORT_SPILL_FILE_SIZE = "drill.exec.sort.external.spill.file_size";
   String EXTERNAL_SORT_MSORT_MAX_BATCHSIZE = "drill.exec.sort.external.msort.batch.maxsize";
+  String EXTERNAL_SORT_DISABLE_MANAGED = "drill.exec.sort.external.disable_managed";
+  String EXTERNAL_SORT_MERGE_LIMIT = "drill.exec.sort.external.merge_limit";
+  String EXTERNAL_SORT_SPILL_BATCH_SIZE = "drill.exec.sort.external.spill.spill_batch_size";
+  String EXTERNAL_SORT_MERGE_BATCH_SIZE = "drill.exec.sort.external.spill.merge_batch_size";
+  String EXTERNAL_SORT_MAX_MEMORY = "drill.exec.sort.external.mem_limit";
+
+  // Used only by the "unmanaged" sort.
+  String EXTERNAL_SORT_BATCH_LIMIT = "drill.exec.sort.external.batch_limit";
+
+  // External Sort Runtime options
+
+  BooleanValidator EXTERNAL_SORT_DISABLE_MANAGED_OPTION = new BooleanValidator("exec.sort.disable_managed", false);
+
+
   String TEXT_LINE_READER_BATCH_SIZE = "drill.exec.storage.file.text.batch.size";
   String TEXT_LINE_READER_BUFFER_SIZE = "drill.exec.storage.file.text.buffer.size";
   String HAZELCAST_SUBNETS = "drill.exec.cache.hazel.subnets";
   String HTTP_ENABLE = "drill.exec.http.enabled";
+  String HTTP_MAX_PROFILES = "drill.exec.http.max_profiles";
   String HTTP_PORT = "drill.exec.http.port";
   String HTTP_ENABLE_SSL = "drill.exec.http.ssl_enabled";
   String HTTP_CORS_ENABLED = "drill.exec.http.cors.enabled";
@@ -91,9 +109,13 @@ public interface ExecConstants {
   String SYS_STORE_PROVIDER_LOCAL_ENABLE_WRITE = "drill.exec.sys.store.provider.local.write";
   String IMPERSONATION_ENABLED = "drill.exec.impersonation.enabled";
   String IMPERSONATION_MAX_CHAINED_USER_HOPS = "drill.exec.impersonation.max_chained_user_hops";
+  String AUTHENTICATION_MECHANISMS = "drill.exec.security.auth.mechanisms";
   String USER_AUTHENTICATION_ENABLED = "drill.exec.security.user.auth.enabled";
   String USER_AUTHENTICATOR_IMPL = "drill.exec.security.user.auth.impl";
   String PAM_AUTHENTICATOR_PROFILES = "drill.exec.security.user.auth.pam_profiles";
+  String BIT_AUTHENTICATION_ENABLED = "drill.exec.security.bit.auth.enabled";
+  String BIT_AUTHENTICATION_MECHANISM = "drill.exec.security.bit.auth.mechanism";
+  String USE_LOGIN_PRINCIPAL = "drill.exec.security.bit.auth.use_login_principal";
   /** Size of JDBC batch queue (in batches) above which throttling begins. */
   String JDBC_BATCH_QUEUE_THROTTLING_THRESHOLD =
       "drill.jdbc.batch_queue_throttling_threshold";
@@ -122,6 +144,7 @@ public interface ExecConstants {
   String UDF_DIRECTORY_STAGING = "drill.exec.udf.directory.staging";
   String UDF_DIRECTORY_REGISTRY = "drill.exec.udf.directory.registry";
   String UDF_DIRECTORY_TMP = "drill.exec.udf.directory.tmp";
+  String UDF_DISABLE_DYNAMIC = "drill.exec.udf.disable_dynamic";
 
   /**
    * Local temporary directory is used as base for temporary storage of Dynamic UDF jars.
@@ -160,6 +183,13 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_ASYNC = "store.parquet.reader.pagereader.async";
   OptionValidator PARQUET_PAGEREADER_ASYNC_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ASYNC, true);
 
+  // Number of pages the Async Parquet page reader will read before blocking
+  String PARQUET_PAGEREADER_QUEUE_SIZE = "store.parquet.reader.pagereader.queuesize";
+  OptionValidator PARQUET_PAGEREADER_QUEUE_SIZE_VALIDATOR = new  PositiveLongValidator(PARQUET_PAGEREADER_QUEUE_SIZE, Integer.MAX_VALUE, 2);
+
+  String PARQUET_PAGEREADER_ENFORCETOTALSIZE = "store.parquet.reader.pagereader.enforceTotalSize";
+  OptionValidator PARQUET_PAGEREADER_ENFORCETOTALSIZE_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ENFORCETOTALSIZE, false);
+
   String PARQUET_COLUMNREADER_ASYNC = "store.parquet.reader.columnreader.async";
   OptionValidator PARQUET_COLUMNREADER_ASYNC_VALIDATOR = new BooleanValidator(PARQUET_COLUMNREADER_ASYNC, false);
 
@@ -167,9 +197,9 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_USE_BUFFERED_READ = "store.parquet.reader.pagereader.bufferedread";
   OptionValidator PARQUET_PAGEREADER_USE_BUFFERED_READ_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_USE_BUFFERED_READ, true);
 
-  // Size in MiB of the buffer the Parquet page reader will use to read from disk. Default is 8 MiB
+  // Size in MiB of the buffer the Parquet page reader will use to read from disk. Default is 1 MiB
   String PARQUET_PAGEREADER_BUFFER_SIZE = "store.parquet.reader.pagereader.buffersize";
-  OptionValidator PARQUET_PAGEREADER_BUFFER_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_BUFFER_SIZE, 4*1024*1024);
+  OptionValidator PARQUET_PAGEREADER_BUFFER_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_BUFFER_SIZE, 1*1024*1024);
 
   // try to use fadvise if available
   String PARQUET_PAGEREADER_USE_FADVISE = "store.parquet.reader.pagereader.usefadvise";
@@ -235,7 +265,7 @@ public interface ExecConstants {
       SLICE_TARGET_DEFAULT);
 
   String CAST_TO_NULLABLE_NUMERIC = "drill.exec.functions.cast_empty_string_to_null";
-  OptionValidator CAST_TO_NULLABLE_NUMERIC_OPTION = new BooleanValidator(CAST_TO_NULLABLE_NUMERIC, false);
+  BooleanValidator CAST_TO_NULLABLE_NUMERIC_OPTION = new BooleanValidator(CAST_TO_NULLABLE_NUMERIC, false);
 
   /**
    * HashTable runtime settings
@@ -390,4 +420,30 @@ public interface ExecConstants {
 
   String DYNAMIC_UDF_SUPPORT_ENABLED = "exec.udf.enable_dynamic_support";
   BooleanValidator DYNAMIC_UDF_SUPPORT_ENABLED_VALIDATOR = new BooleanValidator(DYNAMIC_UDF_SUPPORT_ENABLED, true, true);
+
+  /**
+   * Option to save query profiles. If false, no query profile will be saved
+   * for any query.
+   */
+  String ENABLE_QUERY_PROFILE_OPTION = "exec.query_profile.save";
+  BooleanValidator ENABLE_QUERY_PROFILE_VALIDATOR = new BooleanValidator(
+      ENABLE_QUERY_PROFILE_OPTION, true, false);
+
+  /**
+   * Profiles are normally written after the last client message to reduce latency.
+   * When running tests, however, we want the profile written <i>before</i> the
+   * return so that the client can immediately read the profile for test
+   * verification.
+   */
+  String QUERY_PROFILE_DEBUG_OPTION = "exec.query_profile.debug_mode";
+  BooleanValidator QUERY_PROFILE_DEBUG_VALIDATOR = new BooleanValidator(
+      QUERY_PROFILE_DEBUG_OPTION, false, false);
+
+  String USE_DYNAMIC_UDFS_KEY = "exec.udf.use_dynamic";
+  BooleanValidator USE_DYNAMIC_UDFS = new BooleanValidator(USE_DYNAMIC_UDFS_KEY, true);
+
+
+  String QUERY_TRANSIENT_STATE_UPDATE_KEY = "exec.query.progress.update";
+  BooleanValidator QUERY_TRANSIENT_STATE_UPDATE = new BooleanValidator(QUERY_TRANSIENT_STATE_UPDATE_KEY, true);
+
 }

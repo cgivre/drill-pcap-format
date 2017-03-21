@@ -26,7 +26,6 @@ import java.util.concurrent.Future;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
-import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.ValueVector;
 
@@ -90,8 +89,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     this.isFixedLength = fixedLength;
     this.schemaElement = schemaElement;
     this.valueVec =  v;
-    boolean useAsyncPageReader  = parentReader.getFragmentContext().getOptions()
-        .getOption(ExecConstants.PARQUET_PAGEREADER_ASYNC).bool_val;
+    boolean useAsyncPageReader = parentReader.useAsyncPageReader;
     if (useAsyncPageReader) {
       this.pageReader =
           new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
@@ -101,11 +99,12 @@ public abstract class ColumnReader<V extends ValueVector> {
           new PageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
               columnChunkMetaData);
     }
-
     if (columnDescriptor.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
       if (columnDescriptor.getType() == PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY) {
+        // Here "bits" means "bytes"
         dataTypeLengthInBits = columnDescriptor.getTypeLength() * 8;
       } else {
+        // While here, "bits" means "bits"
         dataTypeLengthInBits = ParquetRecordReader.getTypeLengthInBits(columnDescriptor.getType());
       }
     }
@@ -127,7 +126,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     reset();
     if(recordsToReadInThisPass>0) {
       do {
-        determineSize(recordsToReadInThisPass, 0);
+        determineSize(recordsToReadInThisPass);
 
       } while (valuesReadInCurrentPass < recordsToReadInThisPass && pageReader.hasPage());
     }
@@ -156,9 +155,7 @@ public abstract class ColumnReader<V extends ValueVector> {
           .pushContext("File: ", this.parentReader.getHadoopPath().toString() )
           .build(logger);
       throw ex;
-
     }
-
   }
 
   protected abstract void readField(long recordsToRead);
@@ -173,27 +170,17 @@ public abstract class ColumnReader<V extends ValueVector> {
    * @return - true if we should stop reading
    * @throws IOException
    */
-  public boolean determineSize(long recordsReadInCurrentPass, Integer lengthVarFieldsInCurrentRecord) throws IOException {
+  public boolean determineSize(long recordsReadInCurrentPass) throws IOException {
 
-    boolean doneReading = readPage();
-    if (doneReading) {
+    if (readPage()) {
       return true;
     }
 
-    doneReading = processPageData((int) recordsReadInCurrentPass);
-    if (doneReading) {
+    if (processPageData((int) recordsReadInCurrentPass)) {
       return true;
     }
 
-    // Never used in this code path. Hard to remove because the method is overidden by subclasses
-    lengthVarFieldsInCurrentRecord = -1;
-
-    doneReading = checkVectorCapacityReached();
-    if (doneReading) {
-      return true;
-    }
-
-    return false;
+    return checkVectorCapacityReached();
   }
 
   protected Future<Integer> readRecordsAsync(int recordsToRead){
@@ -267,17 +254,20 @@ public abstract class ColumnReader<V extends ValueVector> {
   protected void hitRowGroupEnd() {}
 
   protected boolean checkVectorCapacityReached() {
+    // Here "bits" means "bytes"
+    // But, inside "capacity", "bits" sometimes means "bits".
+    // Note that bytesReadInCurrentPass is never updated, so this next
+    // line is a no-op.
     if (bytesReadInCurrentPass + dataTypeLengthInBits > capacity()) {
       logger.debug("Reached the capacity of the data vector in a variable length value vector.");
       return true;
     }
-    else if (valuesReadInCurrentPass > valueVec.getValueCapacity()) {
-      return true;
-    }
-    return false;
+    // No op: already checked this earlier and would not be here if this
+    // condition is true.
+    return valuesReadInCurrentPass > valueVec.getValueCapacity();
   }
 
-  // copied out of parquet library, didn't want to deal with the uneeded throws statement they had declared
+  // copied out of Parquet library, didn't want to deal with the uneeded throws statement they had declared
   public static int readIntLittleEndian(DrillBuf in, int offset) {
     int ch4 = in.getByte(offset) & 0xff;
     int ch3 = in.getByte(offset + 1) & 0xff;
@@ -288,7 +278,7 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   private class ColumnReaderProcessPagesTask implements Callable<Long> {
 
-    private final ColumnReader parent = ColumnReader.this;
+    private final ColumnReader<V> parent = ColumnReader.this;
     private final long recordsToReadInThisPass;
 
     public ColumnReaderProcessPagesTask(long recordsToReadInThisPass){
@@ -308,12 +298,11 @@ public abstract class ColumnReader<V extends ValueVector> {
         Thread.currentThread().setName(oldname);
       }
     }
-
   }
 
   private class ColumnReaderReadRecordsTask implements Callable<Integer> {
 
-    private final ColumnReader parent = ColumnReader.this;
+    private final ColumnReader<V> parent = ColumnReader.this;
     private final int recordsToRead;
 
     public ColumnReaderReadRecordsTask(int recordsToRead){

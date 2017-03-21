@@ -238,6 +238,30 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
     return true;
   }
 
+  @Override
+  public int getAllocatedByteCount() {
+    return offsetVector.getAllocatedByteCount() + super.getAllocatedByteCount();
+  }
+
+  @Override
+  public int getPayloadByteCount() {
+    UInt${type.width}Vector.Accessor a = offsetVector.getAccessor();
+    int count = a.getValueCount();
+    if (count == 0) {
+      return 0;
+    } else {
+      // If 1 or more values, then the last value is set to
+      // the offset of the next value, which is the same as
+      // the length of existing values.
+      // In addition to the actual data bytes, we must also
+      // include the "overhead" bytes: the offset vector entries
+      // that accompany each column value. Thus, total payload
+      // size is consumed text bytes + consumed offset vector
+      // bytes.
+      return a.get(count-1) + offsetVector.getPayloadByteCount();
+    }
+  }
+
   private class TransferImpl implements TransferPair{
     ${minor.class}Vector to;
 
