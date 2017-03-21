@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,9 +17,7 @@
  */
 package org.apache.drill.exec.store.openTSDB.schema;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.planner.logical.CreateTableEntry;
@@ -40,12 +38,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.drill.exec.store.openTSDB.Util.validateTableName;
+import static org.apache.drill.exec.store.openTSDB.Util.getValidTableName;
 
-@Slf4j
 public class OpenTSDBSchemaFactory implements SchemaFactory {
 
-  final private String schemaName;
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OpenTSDBSchemaFactory.class);
+
+  private final String schemaName;
   private OpenTSDBStoragePlugin plugin;
 
   public OpenTSDBSchemaFactory(OpenTSDBStoragePlugin plugin, String schemaName) {
@@ -59,13 +58,11 @@ public class OpenTSDBSchemaFactory implements SchemaFactory {
     parent.add(schemaName, schema);
   }
 
-
   class OpenTSDBTables extends AbstractSchema {
-
     private final Map<String, OpenTSDBDatabaseSchema> schemaMap = Maps.newHashMap();
 
-    public OpenTSDBTables(String name) {
-      super(ImmutableList.<String>of(), name);
+    OpenTSDBTables(String name) {
+      super(Collections.<String>emptyList(), name);
     }
 
     @Override
@@ -78,7 +75,7 @@ public class OpenTSDBSchemaFactory implements SchemaFactory {
         }
         return schemaMap.get(name);
       } catch (IOException e) {
-        e.printStackTrace();
+        log.warn("A problem occurred when talking to the server", e);
         return null;
       }
     }
@@ -91,11 +88,11 @@ public class OpenTSDBSchemaFactory implements SchemaFactory {
     @Override
     public Table getTable(String name) {
       OpenTSDBScanSpec scanSpec = new OpenTSDBScanSpec(name);
-      name = validateTableName(name);
+      name = getValidTableName(name);
       try {
         return new DrillOpenTSDBTable(schemaName, plugin, new Schema(plugin.getClient(), name), scanSpec);
       } catch (Exception e) {
-        logger.warn("Failure while retrieving openTSDB table {}", name, e);
+        log.warn("Failure while retrieving openTSDB table {}", name, e);
         return null;
       }
     }
@@ -105,7 +102,7 @@ public class OpenTSDBSchemaFactory implements SchemaFactory {
       try {
         return plugin.getClient().getAllTablesName().execute().body();
       } catch (Exception e) {
-        logger.warn("Failure reading openTSDB tables.", e);
+        log.warn("Failure reading openTSDB tables.", e);
         return Collections.emptySet();
       }
     }
@@ -129,8 +126,8 @@ public class OpenTSDBSchemaFactory implements SchemaFactory {
       return OpenTSDBStoragePluginConfig.NAME;
     }
 
-    DrillTable getDrillTable(String collectionName) {
-      OpenTSDBScanSpec openTSDBScanSpec = new OpenTSDBScanSpec(collectionName);
+    DrillTable getDrillTable(String tableName) {
+      OpenTSDBScanSpec openTSDBScanSpec = new OpenTSDBScanSpec(tableName);
       return new DynamicDrillTable(plugin, schemaName, null, openTSDBScanSpec);
     }
   }

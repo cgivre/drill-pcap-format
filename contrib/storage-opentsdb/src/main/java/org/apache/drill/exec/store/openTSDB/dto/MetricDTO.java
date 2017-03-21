@@ -17,31 +17,33 @@
  */
 package org.apache.drill.exec.store.openTSDB.dto;
 
-import org.apache.drill.exec.store.openTSDB.client.OpenTSDBTypes;
-
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
-public class ColumnDTO {
+public class MetricDTO {
 
-  private final String columnName;
-  private final OpenTSDBTypes columnType;
+  private String metric;
+  private Map<String, String> tags;
+  private List<String> aggregateTags;
+  private Map<String, String> dps;
 
-  public ColumnDTO(String columnName, OpenTSDBTypes columnType) {
-    this.columnName = columnName;
-    this.columnType = columnType;
+  public String getMetric() {
+    return metric;
   }
 
-  public String getColumnName() {
-    return columnName;
+  public Map<String, String> getTags() {
+    return tags;
   }
 
-  public OpenTSDBTypes getColumnType() {
-    return columnType;
+  public List<String> getAggregateTags() {
+    return aggregateTags;
   }
 
-  public boolean isNullable() {
-    return true;
+  public Map<String, String> getDps() {
+    return dps;
   }
+
 
   @Override
   public boolean equals(Object o) {
@@ -51,13 +53,25 @@ public class ColumnDTO {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ColumnDTO columnDTO = (ColumnDTO) o;
-    return Objects.equals(columnName, columnDTO.columnName) &&
-        columnType == columnDTO.columnType;
+    MetricDTO metricDTO = (MetricDTO) o;
+    return Objects.equals(metric, metricDTO.metric) &&
+        Objects.equals(tags, metricDTO.tags) &&
+        Objects.equals(aggregateTags, metricDTO.aggregateTags) &&
+        Objects.equals(dps, metricDTO.dps);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(columnName, columnType);
+    return Objects.hash(metric, tags, aggregateTags, dps);
+  }
+
+  @Override
+  public String toString() {
+    return "Table{" +
+        "metric='" + metric + '\'' +
+        ", tags=" + tags +
+        ", aggregateTags=" + aggregateTags +
+        ", dps=" + dps +
+        '}';
   }
 }

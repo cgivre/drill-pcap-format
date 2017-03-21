@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.store.openTSDB;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -32,9 +31,10 @@ import org.apache.drill.exec.store.RecordReader;
 import java.util.List;
 
 public class OpenTSDBBatchCreator implements BatchCreator<OpenTSDBSubScan> {
+
   @Override
-  public CloseableRecordBatch getBatch(FragmentContext context, OpenTSDBSubScan subScan, List<RecordBatch> children) throws ExecutionSetupException {
-    Preconditions.checkArgument(children.isEmpty());
+  public CloseableRecordBatch getBatch(FragmentContext context, OpenTSDBSubScan subScan,
+                                       List<RecordBatch> children) throws ExecutionSetupException {
     List<RecordReader> readers = Lists.newArrayList();
     List<SchemaPath> columns;
 
@@ -44,8 +44,8 @@ public class OpenTSDBBatchCreator implements BatchCreator<OpenTSDBSubScan> {
           columns = GroupScan.ALL_COLUMNS;
         }
         readers.add(new OpenTSDBRecordReader(subScan.getStorageEngine().getClient(), scanSpec, columns));
-      } catch (Exception e1) {
-        throw new ExecutionSetupException(e1);
+      } catch (Exception e) {
+        throw new ExecutionSetupException(e);
       }
     }
     return new ScanBatch(subScan, context, readers.iterator());
