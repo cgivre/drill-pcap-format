@@ -41,6 +41,11 @@
           type: "json",
           extensions: [ "json" ]
         },
+        "pcap" : {
+          /* Check type of the file */
+          type: "vnd.tcpdump",
+          extensions: [ "pcap" ]
+        },
         "avro" : {
           type: "avro"
         },
