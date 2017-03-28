@@ -43,8 +43,7 @@
         },
         "pcap" : {
           /* Check type of the file */
-          type: "vnd.tcpdump",
-          extensions: [ "pcap" ]
+          type: "pcap"
         },
         "avro" : {
           type: "avro"
