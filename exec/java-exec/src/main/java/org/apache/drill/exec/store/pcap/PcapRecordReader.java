@@ -18,6 +18,8 @@ package org.apache.drill.exec.store.pcap;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.mapr.PacketDecoder;
+import com.mapr.PacketDecoder.Packet;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
@@ -35,15 +37,26 @@ import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.pcap.schema.ColumnDTO;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
+import org.apache.drill.exec.vector.NullableBitVector;
 import org.apache.drill.exec.vector.NullableFloat8Vector;
+import org.apache.drill.exec.vector.NullableIntVector;
+import org.apache.drill.exec.vector.NullableTimeStampVector;
+import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.fn.FieldSelection;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class PcapRecordReader extends AbstractRecordReader {
 
@@ -63,6 +76,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   private OutputMutator output;
   private OperatorContext context;
+  private FileInputStream in;
 
   private ImmutableList<ProjectedColumnInfo> projectedCols;
   private static final Map<PcapTypes, TypeProtos.MinorType> TYPES;
@@ -94,6 +108,15 @@ public class PcapRecordReader extends AbstractRecordReader {
     this.queryUserName = fragmentContext.getQueryUserName();
     setColumns(projectedColumns);
     this.fieldSelection = FieldSelection.getFieldSelection(projectedColumns);
+    try {
+      this.in = new FileInputStream(getPathToFile(inputPath));
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private String getPathToFile(String path) {
+    return path.substring(5);
   }
 
   @Override
@@ -110,7 +133,11 @@ public class PcapRecordReader extends AbstractRecordReader {
     } catch (SchemaChangeException sce) {
       log.warn("the addition of this field is incompatible with this OutputMutator's capabilities", sce);
     }
-    setupDataToDrillTable();
+    try {
+      parsePcapFilesAndPutItToTable(in);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     return 1;
   }
 
@@ -193,22 +220,73 @@ public class PcapRecordReader extends AbstractRecordReader {
         .build(log));
   }
 
-  private void setupDataToDrillTable() {
+  private void setupDataToDrillTable(Packet packet) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
-        case "TEST":
-          setDoubleColumnValue("15.2", pci);
+        case "Source":
+          setStringColumnValue(Arrays.toString(packet.getEthernetDestination()), pci);
+          break;
+        case "Packet Length":
+          setIntegerColumnValue(packet.getPacketLength(), pci);
+          break;
+        case "Timestamp":
+          setTimestampColumnValue(packet.getTimestamp(), pci);
+          break;
+        case "TCP":
+          setBooleanColumnValue(packet.isTcpPacket(), pci);
+          break;
+        case "UDP":
+          setBooleanColumnValue(packet.isUdpPacket(), pci);
           break;
       }
     }
   }
 
-  private void setDoubleColumnValue(String value, ProjectedColumnInfo pci) {
-    setDoubleColumnValue(value != null ? Double.parseDouble(value) : 0.0, pci);
+  private void setBooleanColumnValue(boolean data, ProjectedColumnInfo pci) {
+    ((NullableBitVector.Mutator) pci.vv.getMutator())
+        .setSafe(0, data ? 1 : 0);
   }
 
-  private void setDoubleColumnValue(Double data, ProjectedColumnInfo pci) {
-    ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
+  private void setIntegerColumnValue(int data, ProjectedColumnInfo pci) {
+    ((NullableIntVector.Mutator) pci.vv.getMutator())
         .setSafe(0, data);
+  }
+
+
+  private void setTimestampColumnValue(long data, ProjectedColumnInfo pci) {
+    ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
+        .setSafe(0, data);
+  }
+
+  private void setStringColumnValue(String data, ProjectedColumnInfo pci) {
+    if (data == null) {
+      data = "null";
+    }
+    ByteBuffer value = ByteBuffer.wrap(data.getBytes(UTF_8));
+    ((NullableVarCharVector.Mutator) pci.vv.getMutator())
+        .setSafe(0, value, 0, value.remaining());
+  }
+
+  public void parsePcapFilesAndPutItToTable(FileInputStream in) throws IOException {
+    PacketDecoder pd = new PacketDecoder(in);
+    PacketDecoder.Packet p = pd.packet();
+
+    byte[] buffer = new byte[100000];
+    int validBytes = in.read(buffer);
+
+    int offset = 0;
+    while (offset < validBytes) {
+      if (validBytes - offset < 9000) {
+        System.arraycopy(buffer, 0, buffer, offset, validBytes - offset);
+        validBytes = validBytes - offset;
+        offset = 0;
+
+        int n = in.read(buffer, validBytes, buffer.length - validBytes);
+        if (n > 0) {
+          validBytes += n;
+        }
+      }
+      setupDataToDrillTable(p);
+    }
   }
 }

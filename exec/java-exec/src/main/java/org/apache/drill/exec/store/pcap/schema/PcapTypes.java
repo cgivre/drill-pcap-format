@@ -18,5 +18,9 @@
 package org.apache.drill.exec.store.pcap.schema;
 
 public enum PcapTypes {
-  DOUBLE
+  DOUBLE,
+  INTEGER,
+  STRING,
+  TIMESTAMP,
+  BOOLEAN
 }

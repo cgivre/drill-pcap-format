@@ -29,7 +29,11 @@ public class Schema {
   }
 
   private void setupStructure() {
-    columns.add(new ColumnDTO("TEST", PcapTypes.DOUBLE));
+    columns.add(new ColumnDTO("Source", PcapTypes.STRING));
+    columns.add(new ColumnDTO("Packet Length", PcapTypes.INTEGER));
+    columns.add(new ColumnDTO("Timestamp", PcapTypes.TIMESTAMP));
+    columns.add(new ColumnDTO("TCP", PcapTypes.BOOLEAN));
+    columns.add(new ColumnDTO("UDP", PcapTypes.BOOLEAN));
   }
 
   /**
