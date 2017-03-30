@@ -18,39 +18,31 @@ package org.apache.drill.exec.store.pcap;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.mapr.PacketDecoder;
-import com.mapr.PacketDecoder.Packet;
-import io.netty.buffer.DrillBuf;
+import edu.gatech.sjpcap.Packet;
+import edu.gatech.sjpcap.PcapParser;
+import edu.gatech.sjpcap.TCPPacket;
+import edu.gatech.sjpcap.UDPPacket;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.TypeHelper;
-import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.store.pcap.dto.IpDto;
+import org.apache.drill.exec.store.pcap.dto.PortDto;
 import org.apache.drill.exec.store.pcap.schema.ColumnDTO;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
-import org.apache.drill.exec.vector.NullableBitVector;
-import org.apache.drill.exec.vector.NullableFloat8Vector;
 import org.apache.drill.exec.vector.NullableIntVector;
 import org.apache.drill.exec.vector.NullableTimeStampVector;
 import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.ValueVector;
-import org.apache.drill.exec.vector.complex.fn.FieldSelection;
-import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -60,25 +52,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class PcapRecordReader extends AbstractRecordReader {
 
-  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PcapRecordReader.class);
-
-  private final Path hadoop;
-  private final long start;
-  private final long end;
-  private final FieldSelection fieldSelection;
-  private DrillBuf buffer;
-  private VectorContainerWriter writer;
-
-  private FileSystem fs;
-
-  private final String opUserName;
-  private final String queryUserName;
-
   private OutputMutator output;
   private OperatorContext context;
-  private FileInputStream in;
 
+  private final PcapParser parser;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
+
   private static final Map<PcapTypes, TypeProtos.MinorType> TYPES;
 
   private static class ProjectedColumnInfo {
@@ -88,92 +67,64 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   static {
     TYPES = ImmutableMap.<PcapTypes, TypeProtos.MinorType>builder()
-        .put(PcapTypes.DOUBLE, TypeProtos.MinorType.FLOAT8)
+        .put(PcapTypes.STRING, MinorType.VARCHAR)
+        .put(PcapTypes.INTEGER, MinorType.INT)
+        .put(PcapTypes.TIMESTAMP, MinorType.TIMESTAMP)
         .build();
   }
 
-  public PcapRecordReader(final FragmentContext fragmentContext,
-                          final String inputPath,
-                          final long start,
-                          final long length,
-                          final FileSystem fileSystem,
-                          final List<SchemaPath> projectedColumns,
-                          final String userName) {
-    hadoop = new Path(inputPath);
-    this.start = start;
-    this.end = start + length;
-    buffer = fragmentContext.getManagedBuffer();
-    this.fs = fileSystem;
-    this.opUserName = userName;
-    this.queryUserName = fragmentContext.getQueryUserName();
+  public PcapRecordReader(final String inputPath,
+                          final List<SchemaPath> projectedColumns) {
+    this.parser = new PcapParser();
+    parser.openFile(getPathToFile(inputPath));
     setColumns(projectedColumns);
-    this.fieldSelection = FieldSelection.getFieldSelection(projectedColumns);
-    try {
-      this.in = new FileInputStream(getPathToFile(inputPath));
-    } catch (FileNotFoundException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private String getPathToFile(String path) {
-    return path.substring(5);
   }
 
   @Override
-  public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
+  public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.output = output;
     this.context = context;
-
   }
 
   @Override
   public int next() {
-    try {
-      setupProjectedColsIfItNull();
-    } catch (SchemaChangeException sce) {
-      log.warn("the addition of this field is incompatible with this OutputMutator's capabilities", sce);
-    }
-    try {
-      parsePcapFilesAndPutItToTable(in);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return 1;
+    projectedCols = getProjectedColsIfItNull();
+    return parsePcapFilesAndPutItToTable();
   }
 
   @Override
   public void close() throws Exception {
-
   }
 
-  private void setupProjectedColsIfItNull() throws SchemaChangeException {
-    if (projectedCols == null) {
-      initCols(new Schema());
-    }
+  private ImmutableList<ProjectedColumnInfo> getProjectedColsIfItNull() {
+    return projectedCols != null ? projectedCols : initCols(new Schema());
   }
 
-  private void initCols(Schema schema) throws SchemaChangeException {
+  // TODO: tricky decision, refactor
+  private String getPathToFile(final String path) {
+    return path.substring(5);
+  }
+
+  private ImmutableList<ProjectedColumnInfo> initCols(final Schema schema) {
     ImmutableList.Builder<ProjectedColumnInfo> pciBuilder = ImmutableList.builder();
+    ColumnDTO column;
 
-    for (int i = 0; i < schema.getColumns().size(); i++) {
+    for (int i = 0; i < schema.getNumberOfColumns(); i++) {
+      column = schema.getColumnByIndex(i);
 
-      ColumnDTO column = schema.getColumnByIndex(i);
       final String name = column.getColumnName();
       final PcapTypes type = column.getColumnType();
       TypeProtos.MinorType minorType = TYPES.get(type);
 
-      if (isMinorTypeNull(minorType)) {
-        logExceptionMessage(name, type);
-        continue;
-      }
-
       ProjectedColumnInfo pci = getProjectedColumnInfo(column, name, minorType);
       pciBuilder.add(pci);
     }
-    projectedCols = pciBuilder.build();
+    return pciBuilder.build();
   }
 
-  private ProjectedColumnInfo getProjectedColumnInfo(ColumnDTO column, String name, MinorType minorType) throws SchemaChangeException {
+  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDTO column,
+                                                     final String name,
+                                                     final MinorType minorType) {
     TypeProtos.MajorType majorType = getMajorType(minorType);
 
     MaterializedField field =
@@ -185,108 +136,103 @@ public class PcapRecordReader extends AbstractRecordReader {
     return getProjectedColumnInfo(column, vector);
   }
 
-  private ProjectedColumnInfo getProjectedColumnInfo(ColumnDTO column, ValueVector vector) {
+  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDTO column, final ValueVector vector) {
     ProjectedColumnInfo pci = new ProjectedColumnInfo();
     pci.vv = vector;
     pci.pcapColumn = column;
     return pci;
   }
 
-  private TypeProtos.MajorType getMajorType(TypeProtos.MinorType minorType) {
+  private TypeProtos.MajorType getMajorType(final TypeProtos.MinorType minorType) {
     return Types.optional(minorType);
   }
 
-  private ValueVector getValueVector(TypeProtos.MinorType minorType, TypeProtos.MajorType majorType, MaterializedField field) throws SchemaChangeException {
-    final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(
-        minorType, majorType.getMode());
-    ValueVector vector = output.addField(field, clazz);
-    vector.allocateNew();
-    return vector;
+  private ValueVector getValueVector(final TypeProtos.MinorType minorType,
+                                     final TypeProtos.MajorType majorType,
+                                     final MaterializedField field) {
+    try {
+
+      final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(
+          minorType, majorType.getMode());
+      ValueVector vector = output.addField(field, clazz);
+      vector.allocateNew();
+      return vector;
+
+    } catch (SchemaChangeException sce) {
+      throw new NullPointerException("The addition of this field is incompatible with this OutputMutator's capabilities");
+    }
   }
 
-  private boolean isMinorTypeNull(TypeProtos.MinorType minorType) {
-    return minorType == null;
+  private int parsePcapFilesAndPutItToTable() {
+    Packet packet = parser.getPacket();
+    while (packet != Packet.EOF) {
+      if (packet instanceof TCPPacket) {
+        TCPPacket tcp = ((TCPPacket) packet);
+        setupDataToDrillTable("TCP",
+            tcp.timestamp,
+            new IpDto(tcp.dst_ip.toString(), tcp.src_ip.toString()),
+            new PortDto(tcp.dst_port, tcp.src_port),
+            Arrays.toString(tcp.data));
+        return 1;
+      } else if (packet instanceof UDPPacket) {
+        UDPPacket udp = ((UDPPacket) packet);
+        setupDataToDrillTable("UDP",
+            udp.timestamp,
+            new IpDto(udp.dst_ip.toString(), udp.src_ip.toString()),
+            new PortDto(udp.dst_port, udp.src_port),
+            Arrays.toString(udp.data));
+        return 1;
+      }
+      packet = parser.getPacket();
+    }
+    parser.closeFile();
+    return 0;
   }
 
-  private void logExceptionMessage(String name, PcapTypes type) {
-    log.warn("Ignoring column that is unsupported.", UserException
-        .unsupportedError()
-        .message(
-            "A column you queried has a data type that is not currently supported by the OpenTSDB storage plugin. "
-                + "The column's name was %s and its OpenTSDB data type was %s. ",
-            name, type.toString())
-        .addContext("column Name", name)
-        .addContext("plugin", "openTSDB")
-        .build(log));
-  }
-
-  private void setupDataToDrillTable(Packet packet) {
+  private void setupDataToDrillTable(final String packetName,
+                                     final long timestamp,
+                                     final IpDto ip,
+                                     final PortDto port,
+                                     final String data) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
-        case "Source":
-          setStringColumnValue(Arrays.toString(packet.getEthernetDestination()), pci);
-          break;
-        case "Packet Length":
-          setIntegerColumnValue(packet.getPacketLength(), pci);
+        case "Type":
+          setStringColumnValue(packetName, pci);
           break;
         case "Timestamp":
-          setTimestampColumnValue(packet.getTimestamp(), pci);
+          setTimestampColumnValue(timestamp, pci);
           break;
-        case "TCP":
-          setBooleanColumnValue(packet.isTcpPacket(), pci);
+        case "dst_ip":
+          setStringColumnValue(ip.getDst_ip(), pci);
           break;
-        case "UDP":
-          setBooleanColumnValue(packet.isUdpPacket(), pci);
+        case "src_ip":
+          setStringColumnValue(ip.getSrc_ip(), pci);
           break;
+        case "dst_port":
+          setIntegerColumnValue(port.getDst_port(), pci);
+          break;
+        case "src_port":
+          setIntegerColumnValue(port.getSrc_port(), pci);
+          break;
+        case "Data":
+          setStringColumnValue(data, pci);
       }
     }
   }
 
-  private void setBooleanColumnValue(boolean data, ProjectedColumnInfo pci) {
-    ((NullableBitVector.Mutator) pci.vv.getMutator())
-        .setSafe(0, data ? 1 : 0);
-  }
-
-  private void setIntegerColumnValue(int data, ProjectedColumnInfo pci) {
+  private void setIntegerColumnValue(final int data, final ProjectedColumnInfo pci) {
     ((NullableIntVector.Mutator) pci.vv.getMutator())
         .setSafe(0, data);
   }
 
-
-  private void setTimestampColumnValue(long data, ProjectedColumnInfo pci) {
+  private void setTimestampColumnValue(final long data, final ProjectedColumnInfo pci) {
     ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
         .setSafe(0, data);
   }
 
-  private void setStringColumnValue(String data, ProjectedColumnInfo pci) {
-    if (data == null) {
-      data = "null";
-    }
+  private void setStringColumnValue(final String data, final ProjectedColumnInfo pci) {
     ByteBuffer value = ByteBuffer.wrap(data.getBytes(UTF_8));
     ((NullableVarCharVector.Mutator) pci.vv.getMutator())
         .setSafe(0, value, 0, value.remaining());
-  }
-
-  public void parsePcapFilesAndPutItToTable(FileInputStream in) throws IOException {
-    PacketDecoder pd = new PacketDecoder(in);
-    PacketDecoder.Packet p = pd.packet();
-
-    byte[] buffer = new byte[100000];
-    int validBytes = in.read(buffer);
-
-    int offset = 0;
-    while (offset < validBytes) {
-      if (validBytes - offset < 9000) {
-        System.arraycopy(buffer, 0, buffer, offset, validBytes - offset);
-        validBytes = validBytes - offset;
-        offset = 0;
-
-        int n = in.read(buffer, validBytes, buffer.length - validBytes);
-        if (n > 0) {
-          validBytes += n;
-        }
-      }
-      setupDataToDrillTable(p);
-    }
   }
 }

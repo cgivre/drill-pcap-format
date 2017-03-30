@@ -14,15 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.pcap;
+package org.apache.drill.exec.store.pcap.dto;
 
-import org.apache.drill.BaseTestQuery;
-import org.junit.Test;
+public class PortDto {
 
-public class TestPcapRecordReader extends BaseTestQuery {
+  private final int dst_port;
+  private final int src_port;
 
-  @Test
-  public void testStarQuery() throws Exception {
-    test("select * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`");
+  public PortDto(int dst_port, int src_port) {
+    this.dst_port = dst_port;
+    this.src_port = src_port;
+  }
+
+  public int getDst_port() {
+    return dst_port;
+  }
+
+  public int getSrc_port() {
+    return src_port;
   }
 }

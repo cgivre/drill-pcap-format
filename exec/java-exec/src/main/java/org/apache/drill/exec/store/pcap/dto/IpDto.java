@@ -14,15 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.pcap;
+package org.apache.drill.exec.store.pcap.dto;
 
-import org.apache.drill.BaseTestQuery;
-import org.junit.Test;
+public class IpDto {
 
-public class TestPcapRecordReader extends BaseTestQuery {
+  private final String dst_ip;
+  private final String src_ip;
 
-  @Test
-  public void testStarQuery() throws Exception {
-    test("select * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`");
+  public IpDto(String dst_ip, String src_ip) {
+    this.dst_ip = dst_ip;
+    this.src_ip = src_ip;
+  }
+
+  public String getDst_ip() {
+    return dst_ip;
+  }
+
+  public String getSrc_ip() {
+    return src_ip;
   }
 }

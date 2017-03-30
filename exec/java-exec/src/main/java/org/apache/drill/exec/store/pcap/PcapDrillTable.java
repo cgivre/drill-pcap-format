@@ -49,14 +49,10 @@ public class PcapDrillTable extends DrillTable {
 
   private RelDataType getSqlTypeFromPcapType(RelDataTypeFactory typeFactory, PcapTypes type) {
     switch (type) {
-      case DOUBLE:
-        return typeFactory.createSqlType(SqlTypeName.DOUBLE);
       case INTEGER:
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
       case STRING:
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
-      case BOOLEAN:
-        return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
       case TIMESTAMP:
         return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
       default:

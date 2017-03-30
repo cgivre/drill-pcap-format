@@ -29,11 +29,13 @@ public class Schema {
   }
 
   private void setupStructure() {
-    columns.add(new ColumnDTO("Source", PcapTypes.STRING));
-    columns.add(new ColumnDTO("Packet Length", PcapTypes.INTEGER));
+    columns.add(new ColumnDTO("Type", PcapTypes.STRING));
     columns.add(new ColumnDTO("Timestamp", PcapTypes.TIMESTAMP));
-    columns.add(new ColumnDTO("TCP", PcapTypes.BOOLEAN));
-    columns.add(new ColumnDTO("UDP", PcapTypes.BOOLEAN));
+    columns.add(new ColumnDTO("dst_ip", PcapTypes.STRING));
+    columns.add(new ColumnDTO("src_ip", PcapTypes.STRING));
+    columns.add(new ColumnDTO("dst_port", PcapTypes.INTEGER));
+    columns.add(new ColumnDTO("src_port", PcapTypes.INTEGER));
+    columns.add(new ColumnDTO("Data", PcapTypes.STRING));
   }
 
   /**
@@ -47,5 +49,9 @@ public class Schema {
 
   public ColumnDTO getColumnByIndex(int i) {
     return columns.get(i);
+  }
+
+  public int getNumberOfColumns() {
+    return columns.size();
   }
 }

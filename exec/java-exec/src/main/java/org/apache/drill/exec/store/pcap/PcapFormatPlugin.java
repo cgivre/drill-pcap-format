@@ -64,8 +64,7 @@ public class PcapFormatPlugin extends EasyFormatPlugin<PcapFormatConfig> {
 
   @Override
   public RecordReader getRecordReader(FragmentContext context, DrillFileSystem dfs, FileWork fileWork, List<SchemaPath> columns, String userName) throws ExecutionSetupException {
-    return new PcapRecordReader(context, fileWork.getPath(), fileWork.getStart(), fileWork.getLength(), dfs, columns,
-        userName);
+    return new PcapRecordReader(fileWork.getPath(),columns);
   }
 
   @Override
