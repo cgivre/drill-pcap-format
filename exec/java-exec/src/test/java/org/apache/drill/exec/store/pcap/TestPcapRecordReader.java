@@ -17,12 +17,56 @@
 package org.apache.drill.exec.store.pcap;
 
 import org.apache.drill.BaseTestQuery;
+import org.apache.drill.common.util.TestTools;
+import org.apache.drill.exec.exception.SchemaChangeException;
+import org.apache.drill.exec.rpc.user.QueryDataBatch;
+import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+
+import java.util.List;
 
 public class TestPcapRecordReader extends BaseTestQuery {
 
+  /*
+  * Added for querying big files
+  */
+  @Rule
+  public final TestRule TIMEOUT = TestTools.getTimeoutRule(500000); // 500secs
+
   @Test
   public void testStarQuery() throws Exception {
-    test("select * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`");
+    runSQLVerifyCount("select * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`", 16);
+  }
+
+  @Test
+  public void testCountQuery() throws Exception {
+    runSQLVerifyCount("select count(*) from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`", 1);
+  }
+
+  @Test
+  public void testDistinctQuery() throws Exception {
+    runSQLVerifyCount("select distinct * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`", 1);
+  }
+
+  private void runSQLVerifyCount(String sql, int expectedRowCount)
+      throws Exception {
+    List<QueryDataBatch> results = runSQLWithResults(sql);
+    printResultAndVerifyRowCount(results, expectedRowCount);
+  }
+
+  private List<QueryDataBatch> runSQLWithResults(String sql)
+      throws Exception {
+    return testSqlWithResults(sql);
+  }
+
+  private void printResultAndVerifyRowCount(List<QueryDataBatch> results,
+                                            int expectedRowCount) throws SchemaChangeException {
+    setColumnWidth(25);
+    int rowCount = printResult(results);
+    if (expectedRowCount != -1) {
+      Assert.assertEquals(expectedRowCount, rowCount);
+    }
   }
 }

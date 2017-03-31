@@ -25,6 +25,7 @@ import edu.gatech.sjpcap.UDPPacket;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -33,9 +34,8 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
-import org.apache.drill.exec.store.pcap.dto.IpDto;
-import org.apache.drill.exec.store.pcap.dto.PortDto;
-import org.apache.drill.exec.store.pcap.schema.ColumnDTO;
+import org.apache.drill.exec.store.pcap.dto.ColumnDto;
+import org.apache.drill.exec.store.pcap.dto.PacketDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
 import org.apache.drill.exec.vector.NullableIntVector;
@@ -44,7 +44,6 @@ import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.ValueVector;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -58,11 +57,11 @@ public class PcapRecordReader extends AbstractRecordReader {
   private final PcapParser parser;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
 
-  private static final Map<PcapTypes, TypeProtos.MinorType> TYPES;
+  private static final Map<PcapTypes, MinorType> TYPES;
 
   private static class ProjectedColumnInfo {
     ValueVector vv;
-    ColumnDTO pcapColumn;
+    ColumnDto pcapColumn;
   }
 
   static {
@@ -107,7 +106,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   private ImmutableList<ProjectedColumnInfo> initCols(final Schema schema) {
     ImmutableList.Builder<ProjectedColumnInfo> pciBuilder = ImmutableList.builder();
-    ColumnDTO column;
+    ColumnDto column;
 
     for (int i = 0; i < schema.getNumberOfColumns(); i++) {
       column = schema.getColumnByIndex(i);
@@ -122,7 +121,7 @@ public class PcapRecordReader extends AbstractRecordReader {
     return pciBuilder.build();
   }
 
-  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDTO column,
+  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDto column,
                                                      final String name,
                                                      final MinorType minorType) {
     TypeProtos.MajorType majorType = getMajorType(minorType);
@@ -136,19 +135,19 @@ public class PcapRecordReader extends AbstractRecordReader {
     return getProjectedColumnInfo(column, vector);
   }
 
-  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDTO column, final ValueVector vector) {
+  private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDto column, final ValueVector vector) {
     ProjectedColumnInfo pci = new ProjectedColumnInfo();
     pci.vv = vector;
     pci.pcapColumn = column;
     return pci;
   }
 
-  private TypeProtos.MajorType getMajorType(final TypeProtos.MinorType minorType) {
+  private MajorType getMajorType(final MinorType minorType) {
     return Types.optional(minorType);
   }
 
-  private ValueVector getValueVector(final TypeProtos.MinorType minorType,
-                                     final TypeProtos.MajorType majorType,
+  private ValueVector getValueVector(final MinorType minorType,
+                                     final MajorType majorType,
                                      final MaterializedField field) {
     try {
 
@@ -166,21 +165,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   private int parsePcapFilesAndPutItToTable() {
     Packet packet = parser.getPacket();
     while (packet != Packet.EOF) {
-      if (packet instanceof TCPPacket) {
-        TCPPacket tcp = ((TCPPacket) packet);
-        setupDataToDrillTable("TCP",
-            tcp.timestamp,
-            new IpDto(tcp.dst_ip.toString(), tcp.src_ip.toString()),
-            new PortDto(tcp.dst_port, tcp.src_port),
-            Arrays.toString(tcp.data));
-        return 1;
-      } else if (packet instanceof UDPPacket) {
-        UDPPacket udp = ((UDPPacket) packet);
-        setupDataToDrillTable("UDP",
-            udp.timestamp,
-            new IpDto(udp.dst_ip.toString(), udp.src_ip.toString()),
-            new PortDto(udp.dst_port, udp.src_port),
-            Arrays.toString(udp.data));
+      if (addDataToTable(packet)) {
         return 1;
       }
       packet = parser.getPacket();
@@ -189,33 +174,42 @@ public class PcapRecordReader extends AbstractRecordReader {
     return 0;
   }
 
-  private void setupDataToDrillTable(final String packetName,
-                                     final long timestamp,
-                                     final IpDto ip,
-                                     final PortDto port,
-                                     final String data) {
+  private boolean addDataToTable(final Packet packet) {
+    PacketDto dto;
+    if (packet instanceof TCPPacket) {
+      dto = new PacketDto((TCPPacket) packet);
+    } else if (packet instanceof UDPPacket) {
+      dto = new PacketDto((UDPPacket) packet);
+    } else {
+      return false;
+    }
+    setupDataToDrillTable(dto);
+    return true;
+  }
+
+  private void setupDataToDrillTable(final PacketDto packet) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
         case "Type":
-          setStringColumnValue(packetName, pci);
+          setStringColumnValue(packet.getPacketName(), pci);
           break;
         case "Timestamp":
-          setTimestampColumnValue(timestamp, pci);
+          setTimestampColumnValue(packet.getTimestamp(), pci);
           break;
         case "dst_ip":
-          setStringColumnValue(ip.getDst_ip(), pci);
+          setStringColumnValue(packet.getIp().getDst_ip(), pci);
           break;
         case "src_ip":
-          setStringColumnValue(ip.getSrc_ip(), pci);
+          setStringColumnValue(packet.getIp().getSrc_ip(), pci);
           break;
         case "dst_port":
-          setIntegerColumnValue(port.getDst_port(), pci);
+          setIntegerColumnValue(packet.getPort().getDst_port(), pci);
           break;
         case "src_port":
-          setIntegerColumnValue(port.getSrc_port(), pci);
+          setIntegerColumnValue(packet.getPort().getSrc_port(), pci);
           break;
         case "Data":
-          setStringColumnValue(data, pci);
+          setStringColumnValue(packet.getData(), pci);
       }
     }
   }

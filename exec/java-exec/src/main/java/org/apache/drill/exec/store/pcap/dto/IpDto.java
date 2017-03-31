@@ -16,21 +16,23 @@
  */
 package org.apache.drill.exec.store.pcap.dto;
 
+import java.net.InetAddress;
+
 public class IpDto {
 
-  private final String dst_ip;
-  private final String src_ip;
+  private final InetAddress dst_ip;
+  private final InetAddress src_ip;
 
-  public IpDto(String dst_ip, String src_ip) {
+  public IpDto(InetAddress dst_ip, InetAddress src_ip) {
     this.dst_ip = dst_ip;
     this.src_ip = src_ip;
   }
 
   public String getDst_ip() {
-    return dst_ip;
+    return dst_ip.toString();
   }
 
   public String getSrc_ip() {
-    return src_ip;
+    return src_ip.toString();
   }
 }

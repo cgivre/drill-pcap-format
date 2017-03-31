@@ -23,7 +23,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.dfs.FormatSelection;
-import org.apache.drill.exec.store.pcap.schema.ColumnDTO;
+import org.apache.drill.exec.store.pcap.dto.ColumnDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
 
@@ -61,7 +61,7 @@ public class PcapDrillTable extends DrillTable {
   }
 
   private void convertToRelDataType(RelDataTypeFactory typeFactory, List<String> names, List<RelDataType> types) {
-    for (ColumnDTO column : schema.getColumns()) {
+    for (ColumnDto column : schema.getColumns()) {
       names.add(column.getColumnName());
       RelDataType type = getSqlTypeFromPcapType(typeFactory, column.getColumnType());
       type = typeFactory.createTypeWithNullability(type, column.isNullable());

@@ -16,38 +16,40 @@
  */
 package org.apache.drill.exec.store.pcap.schema;
 
+import org.apache.drill.exec.store.pcap.dto.ColumnDto;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class Schema {
 
-  private final List<ColumnDTO> columns = new ArrayList<>();
+  private final List<ColumnDto> columns = new ArrayList<>();
 
   public Schema() {
     setupStructure();
   }
 
   private void setupStructure() {
-    columns.add(new ColumnDTO("Type", PcapTypes.STRING));
-    columns.add(new ColumnDTO("Timestamp", PcapTypes.TIMESTAMP));
-    columns.add(new ColumnDTO("dst_ip", PcapTypes.STRING));
-    columns.add(new ColumnDTO("src_ip", PcapTypes.STRING));
-    columns.add(new ColumnDTO("dst_port", PcapTypes.INTEGER));
-    columns.add(new ColumnDTO("src_port", PcapTypes.INTEGER));
-    columns.add(new ColumnDTO("Data", PcapTypes.STRING));
+    columns.add(new ColumnDto("Type", PcapTypes.STRING));
+    columns.add(new ColumnDto("Timestamp", PcapTypes.TIMESTAMP));
+    columns.add(new ColumnDto("dst_ip", PcapTypes.STRING));
+    columns.add(new ColumnDto("src_ip", PcapTypes.STRING));
+    columns.add(new ColumnDto("dst_port", PcapTypes.INTEGER));
+    columns.add(new ColumnDto("src_port", PcapTypes.INTEGER));
+    columns.add(new ColumnDto("Data", PcapTypes.STRING));
   }
 
   /**
    * Return list with all columns names and its types
    *
-   * @return List<ColumnDTO>
+   * @return List<ColumnDto>
    */
-  public List<ColumnDTO> getColumns() {
+  public List<ColumnDto> getColumns() {
     return Collections.unmodifiableList(columns);
   }
 
-  public ColumnDTO getColumnByIndex(int i) {
+  public ColumnDto getColumnByIndex(int i) {
     return columns.get(i);
   }
 

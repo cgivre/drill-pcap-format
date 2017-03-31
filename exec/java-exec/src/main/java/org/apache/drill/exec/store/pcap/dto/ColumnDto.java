@@ -15,16 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.pcap.schema;
+package org.apache.drill.exec.store.pcap.dto;
+
+import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 
 import java.util.Objects;
 
-public class ColumnDTO {
+public class ColumnDto {
 
   private final String columnName;
   private final PcapTypes columnType;
 
-  public ColumnDTO(String columnName, PcapTypes columnType) {
+  public ColumnDto(String columnName, PcapTypes columnType) {
     this.columnName = columnName;
     this.columnType = columnType;
   }
@@ -49,9 +51,9 @@ public class ColumnDTO {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ColumnDTO columnDTO = (ColumnDTO) o;
-    return Objects.equals(columnName, columnDTO.columnName) &&
-        columnType == columnDTO.columnType;
+    ColumnDto columnDto = (ColumnDto) o;
+    return Objects.equals(columnName, columnDto.columnName) &&
+        columnType == columnDto.columnType;
   }
 
   @Override

@@ -69,7 +69,7 @@ public class Schema {
   /**
    * Return list with all columns names and its types
    *
-   * @return List<ColumnDTO>
+   * @return List<ColumnDto>
    */
   public List<ColumnDTO> getColumns() {
     return Collections.unmodifiableList(columns);
@@ -86,7 +86,7 @@ public class Schema {
 
   /**
    * @param columnIndex index of required column in table
-   * @return ColumnDTO
+   * @return ColumnDto
    */
   public ColumnDTO getColumnByIndex(int columnIndex) {
     return columns.get(columnIndex);
