@@ -18,10 +18,6 @@ package org.apache.drill.exec.store.pcap;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import edu.gatech.sjpcap.Packet;
-import edu.gatech.sjpcap.PcapParser;
-import edu.gatech.sjpcap.TCPPacket;
-import edu.gatech.sjpcap.UDPPacket;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
@@ -34,6 +30,8 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
+import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
 import org.apache.drill.exec.store.pcap.dto.ColumnDto;
 import org.apache.drill.exec.store.pcap.dto.PacketDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
@@ -43,6 +41,9 @@ import org.apache.drill.exec.vector.NullableTimeStampVector;
 import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.ValueVector;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +55,13 @@ public class PcapRecordReader extends AbstractRecordReader {
   private OutputMutator output;
   private OperatorContext context;
 
-  private final PcapParser parser;
+  private final PacketDecoder decoder;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
+
+  private byte[] buffer = new byte[100000];
+  private int offset = 0;
+  private InputStream in;
+  private int validBytes;
 
   private static final Map<PcapTypes, MinorType> TYPES;
 
@@ -74,8 +80,13 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   public PcapRecordReader(final String inputPath,
                           final List<SchemaPath> projectedColumns) {
-    this.parser = new PcapParser();
-    parser.openFile(getPathToFile(inputPath));
+    try {
+      this.in = new FileInputStream(getPathToFile(inputPath));
+      this.decoder = getPacketDecoder();
+      validBytes = in.read(buffer);
+    } catch (IOException e) {
+      throw new RuntimeException("File " + getPathToFile(inputPath) + " not Found");
+    }
     setColumns(projectedColumns);
   }
 
@@ -88,11 +99,23 @@ public class PcapRecordReader extends AbstractRecordReader {
   @Override
   public int next() {
     projectedCols = getProjectedColsIfItNull();
-    return parsePcapFilesAndPutItToTable();
+    try {
+      return parsePcapFilesAndPutItToTable();
+    } catch (IOException io) {
+      throw new RuntimeException("Trouble with reading packets in file!");
+    }
   }
 
   @Override
   public void close() throws Exception {
+  }
+
+  private PacketDecoder getPacketDecoder() {
+    try {
+      return new PacketDecoder(in);
+    } catch (IOException io) {
+      throw new RuntimeException("File Not Found or some I/O issue");
+    }
   }
 
   private ImmutableList<ProjectedColumnInfo> getProjectedColsIfItNull() {
@@ -162,28 +185,40 @@ public class PcapRecordReader extends AbstractRecordReader {
     }
   }
 
-  private int parsePcapFilesAndPutItToTable() {
-    Packet packet = parser.getPacket();
-    while (packet != Packet.EOF) {
+  private int parsePcapFilesAndPutItToTable() throws IOException {
+    Packet packet = decoder.packet();
+    while (offset < validBytes) {
+
+      if (validBytes - offset < 9000) {
+        System.arraycopy(buffer, 0, buffer, offset, validBytes - offset);
+        validBytes = validBytes - offset;
+        offset = 0;
+
+        int n = in.read(buffer, validBytes, buffer.length - validBytes);
+        if (n > 0) {
+          validBytes += n;
+        }
+      }
+
+      offset = decoder.decodePacket(buffer, offset, packet);
+
       if (addDataToTable(packet)) {
         return 1;
       }
-      packet = parser.getPacket();
     }
-    parser.closeFile();
     return 0;
   }
 
   private boolean addDataToTable(final Packet packet) {
-    PacketDto dto;
-    if (packet instanceof TCPPacket) {
-      dto = new PacketDto((TCPPacket) packet);
-    } else if (packet instanceof UDPPacket) {
-      dto = new PacketDto((UDPPacket) packet);
+    String packetName;
+    if (packet.isTcpPacket()) {
+      packetName = "TCP";
+    } else if (packet.isUdpPacket()) {
+      packetName = "UDP";
     } else {
       return false;
     }
-    setupDataToDrillTable(dto);
+    setupDataToDrillTable(new PacketDto(packetName, packet));
     return true;
   }
 
@@ -202,14 +237,8 @@ public class PcapRecordReader extends AbstractRecordReader {
         case "src_ip":
           setStringColumnValue(packet.getIp().getSrc_ip(), pci);
           break;
-        case "dst_port":
-          setIntegerColumnValue(packet.getPort().getDst_port(), pci);
-          break;
-        case "src_port":
-          setIntegerColumnValue(packet.getPort().getSrc_port(), pci);
-          break;
-        case "Data":
-          setStringColumnValue(packet.getData(), pci);
+        case "packet_length":
+          setIntegerColumnValue(packet.getPacketLength(), pci);
       }
     }
   }

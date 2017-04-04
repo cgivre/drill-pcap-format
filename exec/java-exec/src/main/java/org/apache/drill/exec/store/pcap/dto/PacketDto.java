@@ -16,33 +16,20 @@
  */
 package org.apache.drill.exec.store.pcap.dto;
 
-import edu.gatech.sjpcap.TCPPacket;
-import edu.gatech.sjpcap.UDPPacket;
-
-import java.util.Arrays;
+import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
 
 public class PacketDto {
 
   private final String packetName;
   private final long timestamp;
   private final IpDto ip;
-  private final PortDto port;
-  private final byte[] data;
+  private final int packetLength;
 
-  public PacketDto(TCPPacket packet) {
-    this.packetName = "TCP";
-    this.timestamp = packet.timestamp;
-    this.ip = new IpDto(packet.dst_ip, packet.src_ip);
-    this.port = new PortDto(packet.dst_port, packet.src_port);
-    this.data = packet.data;
-  }
-
-  public PacketDto(UDPPacket packet) {
-    this.packetName = "UDP";
-    this.timestamp = packet.timestamp;
-    this.ip = new IpDto(packet.dst_ip, packet.src_ip);
-    this.port = new PortDto(packet.dst_port, packet.src_port);
-    this.data = packet.data;
+  public PacketDto(String packetName, Packet packet) {
+    this.packetName = packetName;
+    this.timestamp = packet.getTimestamp();
+    this.ip = new IpDto(packet.getEthernetDestination(), packet.getEthernetSource());
+    this.packetLength = packet.getPacketLength();
   }
 
   public String getPacketName() {
@@ -57,11 +44,8 @@ public class PacketDto {
     return ip;
   }
 
-  public PortDto getPort() {
-    return port;
-  }
 
-  public String getData() {
-    return Arrays.toString(data);
+  public int getPacketLength() {
+    return packetLength;
   }
 }

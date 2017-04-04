@@ -35,9 +35,7 @@ public class Schema {
     columns.add(new ColumnDto("Timestamp", PcapTypes.TIMESTAMP));
     columns.add(new ColumnDto("dst_ip", PcapTypes.STRING));
     columns.add(new ColumnDto("src_ip", PcapTypes.STRING));
-    columns.add(new ColumnDto("dst_port", PcapTypes.INTEGER));
-    columns.add(new ColumnDto("src_port", PcapTypes.INTEGER));
-    columns.add(new ColumnDto("Data", PcapTypes.STRING));
+    columns.add(new ColumnDto("packet_length", PcapTypes.INTEGER));
   }
 
   /**
