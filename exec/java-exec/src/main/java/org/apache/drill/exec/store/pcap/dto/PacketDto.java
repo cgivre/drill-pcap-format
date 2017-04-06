@@ -24,12 +24,18 @@ public class PacketDto {
   private final long timestamp;
   private final IpDto ip;
   private final int packetLength;
+  private final int src_port;
+  private final int dst_port;
+  private final byte[] data;
 
   public PacketDto(String packetName, Packet packet) {
     this.packetName = packetName;
     this.timestamp = packet.getTimestamp();
     this.ip = new IpDto(packet.getEthernetDestination(), packet.getEthernetSource());
     this.packetLength = packet.getPacketLength();
+    this.src_port = packet.getSrc_port();
+    this.dst_port = packet.getDst_port();
+    this.data = packet.getData();
   }
 
   public String getPacketName() {
@@ -40,6 +46,14 @@ public class PacketDto {
     return timestamp;
   }
 
+  public int getSrc_port() {
+    return src_port;
+  }
+
+  public int getDst_port() {
+    return dst_port;
+  }
+
   public IpDto getIp() {
     return ip;
   }
@@ -47,5 +61,9 @@ public class PacketDto {
 
   public int getPacketLength() {
     return packetLength;
+  }
+
+  public byte[] getData() {
+    return data;
   }
 }

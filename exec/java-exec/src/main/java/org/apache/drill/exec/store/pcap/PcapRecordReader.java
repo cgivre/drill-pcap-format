@@ -45,6 +45,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -237,8 +238,17 @@ public class PcapRecordReader extends AbstractRecordReader {
         case "src_ip":
           setStringColumnValue(packet.getIp().getSrc_ip(), pci);
           break;
+        case "src_port":
+          setIntegerColumnValue(packet.getSrc_port(), pci);
+          break;
+        case "dst_port":
+          setIntegerColumnValue(packet.getDst_port(), pci);
+          break;
         case "packet_length":
           setIntegerColumnValue(packet.getPacketLength(), pci);
+          break;
+        case "data":
+          setStringColumnValue(Arrays.toString(packet.getData()), pci);
       }
     }
   }

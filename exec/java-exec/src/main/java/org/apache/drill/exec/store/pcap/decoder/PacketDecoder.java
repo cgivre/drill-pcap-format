@@ -23,6 +23,7 @@ import com.google.common.primitives.Shorts;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 
 public class PacketDecoder {
   //  typedef struct pcap_hdr_s {
@@ -165,6 +166,8 @@ public class PacketDecoder {
     private static final int ENCAPSULATING_SECURITY_V6 = 50;
     private static final int MOBILITY_EXTENSION_V6 = 135;
     private static final int NO_NEXT_HEADER = 59;
+    public static final int UDP_HEADER_LENGTH = 8;
+    public static final int VER_IHL_OFSET = 14;
 
     private long timestamp;
 
@@ -177,6 +180,10 @@ public class PacketDecoder {
     int ipVersion;
     int subOffset;
     int payloadOffset;
+
+    private int src_port;
+    private int dst_port;
+    private byte[] data;
 
     private int packetLength;
     private int etherProtocol;
@@ -223,11 +230,14 @@ public class PacketDecoder {
         Preconditions.checkState(n >= 20 && n < 200, "Invalid header length: ", n);
         subOffset = ipOffset + n;
 
-//        Preconditions.checkState(getShort(raw, ipOffset + 6) == 0, "Don't support IP fragmentation yet");
+        Preconditions.checkState(getShort(raw, ipOffset + 6) == 0, "Don't support IP fragmentation yet");
 
         protocol = getByte(raw, ipOffset + 9);
         if (isTcpPacket()) {
+          buildTCPPacket(Arrays.copyOfRange(raw, PCAP_HEADER_SIZE , packetLength + PCAP_HEADER_SIZE));
           payloadOffset = subOffset + (raw[subOffset + 12] >>> 4);
+        } else if(isUdpPacket()) {
+          buildUDPPacket(Arrays.copyOfRange(raw, PCAP_HEADER_SIZE , packetLength + PCAP_HEADER_SIZE));
         }
       } else if (isIpV6Packet()) {
         Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
@@ -262,7 +272,7 @@ public class PacketDecoder {
               Preconditions.checkState(false, "Can't handle ENCAPSULATING_SECURITY extension");
               break;
             default:
-//              Preconditions.checkState(false, "Unknown V6 extension or protocol: ", nextHeader);
+              Preconditions.checkState(false, "Unknown V6 extension or protocol: ", nextHeader);
               break;
           }
         }
@@ -272,6 +282,73 @@ public class PacketDecoder {
         }
         protocol = nextHeader;
       }
+    }
+
+    private void buildTCPPacket(byte[] packet) {
+      final int inTCPHeaderSrcPortOffset = 0;
+      final int inTCPHeaderDstPortOffset = 2;
+
+      int srcPortOffset = etherHeaderLength +
+          ipV4HeaderLength() + inTCPHeaderSrcPortOffset;
+      this.src_port = convertShort(packet, srcPortOffset);
+
+      int dstPortOffset = etherHeaderLength +
+          ipV4HeaderLength() + inTCPHeaderDstPortOffset;
+      this.dst_port = this.convertShort(packet, dstPortOffset);
+
+
+      int payloadDataStart = etherHeaderLength +
+          getIPHeaderLength(packet) + this.getTCPHeaderLength(packet);
+      byte[] data = new byte[0];
+      if ((packet.length - payloadDataStart) > 0) {
+        data = new byte[packet.length - payloadDataStart];
+        System.arraycopy(packet, payloadDataStart, data, 0, data.length);
+      }
+      this.data = data;
+    }
+
+    private int getIPHeaderLength(byte[] packet) {
+      return (packet[VER_IHL_OFSET] & 0xF) * 4;
+    }
+
+    private void buildUDPPacket(byte[] packet) {
+      final int inUDPHeaderSrcPortOffset = 0;
+      final int inUDPHeaderDstPortOffset = 2;
+
+      int srcPortOffset = etherHeaderLength +
+          ipV4HeaderLength() + inUDPHeaderSrcPortOffset;
+      this.src_port = this.convertShort(packet, srcPortOffset);
+
+      int dstPortOffset = etherHeaderLength +
+          ipV4HeaderLength() + inUDPHeaderDstPortOffset;
+      this.dst_port = this.convertShort(packet, dstPortOffset);
+
+      int payloadDataStart = etherHeaderLength +
+          ipV4HeaderLength() + UDP_HEADER_LENGTH;
+      byte[] data = new byte[0];
+      if ((packet.length - payloadDataStart) > 0) {
+        data = new byte[packet.length - payloadDataStart];
+        System.arraycopy(packet, payloadDataStart, data, 0, data.length);
+      }
+      this.data = data;
+    }
+
+    private int getTCPHeaderLength(byte[] packet) {
+      final int inTCPHeaderDataOffset = 12;
+
+      int dataOffset = etherHeaderLength +
+          getIPHeaderLength(packet) + inTCPHeaderDataOffset;
+      return ((packet[dataOffset] >> 4) & 0xF) * 4;
+    }
+
+    private int convertShort(byte[] data, int offset) {
+      byte[] target = new byte[2];
+      System.arraycopy(data, offset, target, 0, target.length);
+      return this.convertShort(target);
+    }
+
+    private int convertShort(byte[] data) {
+      return ((data[0] & 0xFF) << 8) | (data[1] & 0xFF);
     }
 
     private int decodePcapHeader() {
@@ -324,6 +401,18 @@ public class PacketDecoder {
 
     public long getTimestamp() {
       return timestamp;
+    }
+
+    public int getSrc_port() {
+      return src_port;
+    }
+
+    public int getDst_port() {
+      return dst_port;
+    }
+
+    public byte[] getData() {
+      return data;
     }
   }
 }
