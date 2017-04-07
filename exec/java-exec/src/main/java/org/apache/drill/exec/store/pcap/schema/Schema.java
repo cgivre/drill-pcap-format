@@ -32,6 +32,7 @@ public class Schema {
 
   private void setupStructure() {
     columns.add(new ColumnDto("Type", PcapTypes.STRING));
+    columns.add(new ColumnDto("Network", PcapTypes.INTEGER));
     columns.add(new ColumnDto("Timestamp", PcapTypes.TIMESTAMP));
     columns.add(new ColumnDto("dst_ip", PcapTypes.STRING));
     columns.add(new ColumnDto("src_ip", PcapTypes.STRING));

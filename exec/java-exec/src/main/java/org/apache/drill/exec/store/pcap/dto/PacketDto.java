@@ -17,21 +17,24 @@
 package org.apache.drill.exec.store.pcap.dto;
 
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
+import org.apache.drill.exec.store.pcap.decoder.PacketIP;
 
 public class PacketDto {
 
   private final String packetName;
   private final long timestamp;
-  private final IpDto ip;
+  private final PacketIP ip;
   private final int packetLength;
   private final int src_port;
   private final int dst_port;
   private final byte[] data;
+  private final int network;
 
-  public PacketDto(String packetName, Packet packet) {
+  public PacketDto(String packetName, int networkType, Packet packet) {
     this.packetName = packetName;
+    this.network = networkType;
     this.timestamp = packet.getTimestamp();
-    this.ip = new IpDto(packet.getEthernetDestination(), packet.getEthernetSource());
+    this.ip = packet.getPacketIP();
     this.packetLength = packet.getPacketLength();
     this.src_port = packet.getSrc_port();
     this.dst_port = packet.getDst_port();
@@ -40,6 +43,10 @@ public class PacketDto {
 
   public String getPacketName() {
     return packetName;
+  }
+
+  public int getNetwork() {
+    return network;
   }
 
   public long getTimestamp() {
@@ -54,10 +61,9 @@ public class PacketDto {
     return dst_port;
   }
 
-  public IpDto getIp() {
+  public PacketIP getIp() {
     return ip;
   }
-
 
   public int getPacketLength() {
     return packetLength;

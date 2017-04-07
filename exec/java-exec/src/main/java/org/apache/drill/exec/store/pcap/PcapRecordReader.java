@@ -188,6 +188,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   private int parsePcapFilesAndPutItToTable() throws IOException {
     Packet packet = decoder.packet();
+    int networkType = decoder.getNetwork();
     while (offset < validBytes) {
 
       if (validBytes - offset < 9000) {
@@ -203,14 +204,14 @@ public class PcapRecordReader extends AbstractRecordReader {
 
       offset = decoder.decodePacket(buffer, offset, packet);
 
-      if (addDataToTable(packet)) {
+      if (addDataToTable(packet, networkType)) {
         return 1;
       }
     }
     return 0;
   }
 
-  private boolean addDataToTable(final Packet packet) {
+  private boolean addDataToTable(final Packet packet, final int networkType) {
     String packetName;
     if (packet.isTcpPacket()) {
       packetName = "TCP";
@@ -219,7 +220,7 @@ public class PcapRecordReader extends AbstractRecordReader {
     } else {
       return false;
     }
-    setupDataToDrillTable(new PacketDto(packetName, packet));
+    setupDataToDrillTable(new PacketDto(packetName, networkType, packet));
     return true;
   }
 
@@ -232,11 +233,14 @@ public class PcapRecordReader extends AbstractRecordReader {
         case "Timestamp":
           setTimestampColumnValue(packet.getTimestamp(), pci);
           break;
+        case "Network":
+          setIntegerColumnValue(packet.getNetwork(), pci);
+          break;
         case "dst_ip":
-          setStringColumnValue(packet.getIp().getDst_ip(), pci);
+          setStringColumnValue(packet.getIp().getDst_ip().toString(), pci);
           break;
         case "src_ip":
-          setStringColumnValue(packet.getIp().getSrc_ip(), pci);
+          setStringColumnValue(packet.getIp().getSrc_ip().toString(), pci);
           break;
         case "src_port":
           setIntegerColumnValue(packet.getSrc_port(), pci);
@@ -248,7 +252,12 @@ public class PcapRecordReader extends AbstractRecordReader {
           setIntegerColumnValue(packet.getPacketLength(), pci);
           break;
         case "data":
-          setStringColumnValue(Arrays.toString(packet.getData()), pci);
+          if (packet.getData() != null) {
+            setStringColumnValue(Arrays.toString(packet.getData()), pci);
+          } else {
+            setStringColumnValue("[]", pci);
+          }
+          break;
       }
     }
   }
