@@ -42,7 +42,6 @@
           extensions: [ "json" ]
         },
         "pcap" : {
-          /* Check type of the file */
           type: "pcap"
         },
         "avro" : {

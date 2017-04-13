@@ -192,7 +192,7 @@ public class PcapRecordReader extends AbstractRecordReader {
     while (offset < validBytes) {
 
       if (validBytes - offset < 9000) {
-        System.arraycopy(buffer, 0, buffer, offset, validBytes - offset);
+        System.arraycopy(buffer, offset, buffer, 0, validBytes - offset);
         validBytes = validBytes - offset;
         offset = 0;
 

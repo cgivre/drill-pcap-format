@@ -88,38 +88,12 @@ public class PacketDecoder {
     network = getIntFileOrder(globalHeader, 20);
   }
 
-  public void addTcpListener(final TcpListener listener) {
-
-  }
-
-  public Packet nextPacket() throws IOException {
-    Packet r = new Packet();
-    if (r.readPcap(input)) {
-      return r;
-    } else {
-      return null;
-    }
-  }
-
-  public boolean isBigEndian() {
-    return bigEndian;
-  }
-
   public int decodePacket(final byte[] buffer, final int offset, Packet p) {
     return p.decodePcap(buffer, offset);
   }
 
   public Packet packet() {
     return new Packet();
-  }
-
-  private class InvalidPcapFormat extends IOException {
-    public InvalidPcapFormat(String msg) {
-      super(msg);
-    }
-  }
-
-  private class TcpListener {
   }
 
   public int getIntFileOrder(final byte[] buf, final int offset) {
@@ -163,9 +137,18 @@ public class PacketDecoder {
     //            guint32 orig_len;       /* actual length of packet */
     //        } pcaprec_hdr_t;
     private static final int PCAP_HEADER_SIZE = 4 * 4;
+
+    private static final int TIMESTAMP_OFFSET = 0;
+    private static final int TIMESTAMP_MICRO_OFFSET = 4;
+    private static final int ORIGINAL_LENGTH_OFFSET = 8;
+    private static final int ACTUAL_LENGTH_OFFSET = 12;
+
+    private static final int PACKET_PROTOCOL_OFFSET = 12;
+
     private static final byte ICMP_PROTOCOL = 1;
     private static final byte TCP_PROTOCOL = 6;
     private static final byte UDP_PROTOCOL = 17;
+
     private static final int HOP_BY_HOP_EXTENSION_V6 = 0;
     private static final int DESTINATION_OPTIONS_V6 = 60;
     private static final int ROUTING_V6 = 43;
@@ -177,8 +160,10 @@ public class PacketDecoder {
     private static final int UDP_HEADER_LENGTH = 8;
     private static final int VER_IHL_OFFSET = 14;
 
-    public static final int IP_SRC_OFFSET = 26;
-    public static final int IP_DST_OFFSET = 30;
+    private static final int IP_OFFSET = 14;
+
+    private static final int IP_SRC_OFFSET = 26;
+    private static final int IP_DST_OFFSET = 30;
 
     private long timestamp;
 
@@ -189,11 +174,10 @@ public class PacketDecoder {
     int etherOffset;
     int ipOffset;
     int ipVersion;
-    int subOffset;
 
     int payloadOffset;
 
-    private org.apache.drill.exec.store.pcap.dto.IpDto IpDto;
+    private IpDto IpDto;
 
     private int src_port;
     private int dst_port;
@@ -203,60 +187,42 @@ public class PacketDecoder {
     private int etherProtocol;
     private int protocol;
 
-    public boolean readPcap(final InputStream in) throws IOException {
-      pcapHeader = new byte[PCAP_HEADER_SIZE];
-      pcapOffset = 0;
-      int n = in.read(pcapHeader);
-      if (n < pcapHeader.length) {
-        return false;
-      }
-      int originalLength = decodePcapHeader();
-
-      raw = new byte[originalLength];
-      n = in.read(raw);
-      etherOffset = 0;
-
-      decodeEtherPacket();
-      return true;
-    }
-
     public int decodePcap(final byte[] buffer, final int offset) {
-      pcapHeader = buffer;
       pcapOffset = offset;
-      int originalLength = decodePcapHeader();
 
       raw = buffer;
       etherOffset = offset + PCAP_HEADER_SIZE;
 
-      decodeEtherPacket();
+      pcapHeader = Arrays.copyOfRange(raw, pcapOffset, etherOffset);
+      int originalLength = decodePcapHeader();
+
+      byte[] packet = Arrays.copyOfRange(raw, etherOffset, packetLength + etherOffset);
+      decodeEtherPacket(packet);
       return offset + PCAP_HEADER_SIZE + originalLength;
     }
 
     private int decodePcapHeader() {
-      timestamp = getIntFileOrder(pcapHeader, pcapOffset) * 1000L + getIntFileOrder(pcapHeader, 4) / 1000L;
-      int originalLength = getIntFileOrder(pcapHeader, pcapOffset + 8);
+      timestamp = getIntFileOrder(pcapHeader, TIMESTAMP_OFFSET) * 1000L + getIntFileOrder(pcapHeader, TIMESTAMP_MICRO_OFFSET) / 1000L;
+      int originalLength = getIntFileOrder(pcapHeader, ORIGINAL_LENGTH_OFFSET);
       Preconditions.checkState(originalLength < maxLength, "Packet too long (%d bytes)", originalLength);
-      packetLength = getIntFileOrder(pcapHeader, pcapOffset + 12);
+      packetLength = getIntFileOrder(pcapHeader,   ACTUAL_LENGTH_OFFSET);
       return originalLength;
     }
 
-    private void decodeEtherPacket() {
-      int n;
-      etherProtocol = getShort(raw, etherOffset + 12);
-      ipOffset = etherOffset + 14;
-      byte[] packet = Arrays.copyOfRange(raw, etherOffset, packetLength + etherOffset);
+    private void decodeEtherPacket(byte[] packet) {
+      etherProtocol = getShort(packet, PACKET_PROTOCOL_OFFSET);
+      ipOffset = etherOffset + IP_OFFSET;
       if (isIpV4Packet()) {
         Preconditions.checkState(ipVersion() == 4, "Should have seen IP version 4, got %d", ipVersion());
         ipVersion = 4;
 
-        n = ipV4HeaderLength();
+        int n = ipV4HeaderLength();
         Preconditions.checkState(n >= 20 && n < 200, "Invalid header length: ", n);
-        subOffset = ipOffset + n;
 
 //        Preconditions.checkState(getShort(raw, ipOffset + 6) == 0, "Don't support IP fragmentation yet");
 
         protocol = getByte(raw, ipOffset + 9);
-
+        IpDto = getIPFromPacket(packet);
       } else if (isIpV6Packet()) {
         Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
         ipVersion = 6;
@@ -298,12 +264,11 @@ public class PacketDecoder {
         if (nextHeader != NO_NEXT_HEADER) {
           payloadOffset = ipOffset + headerLength;
         }
+        IpDto = getIPFromPacket(packet);
         protocol = nextHeader;
       }
-      IpDto = getIPFromPacket(packet);
       if (isTcpPacket()) {
         buildTCPPacket(packet);
-        payloadOffset = subOffset + (raw[subOffset + 12] >>> 4);
       } else if (isUdpPacket()) {
         buildUDPPacket(packet);
       }
