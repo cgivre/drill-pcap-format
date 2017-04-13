@@ -145,6 +145,7 @@ public class PacketDecoder {
 
     private static final int PACKET_PROTOCOL_OFFSET = 12;
 
+    private static final byte ARP_PROTOCOL = 0;
     private static final byte ICMP_PROTOCOL = 1;
     private static final byte TCP_PROTOCOL = 6;
     private static final byte UDP_PROTOCOL = 17;
@@ -386,6 +387,14 @@ public class PacketDecoder {
 
     public boolean isUdpPacket() {
       return protocol == UDP_PROTOCOL;
+    }
+
+    public boolean isArpPacket() {
+      return protocol == ARP_PROTOCOL;
+    }
+
+    public boolean isIcmpPacket() {
+      return protocol == ICMP_PROTOCOL;
     }
 
     public int getPacketLength() {

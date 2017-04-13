@@ -217,7 +217,11 @@ public class PcapRecordReader extends AbstractRecordReader {
       packetName = "TCP";
     } else if (packet.isUdpPacket()) {
       packetName = "UDP";
-    } else {
+    } else if (packet.isArpPacket()) {
+      packetName = "ARP";
+    } else if(packet.isIcmpPacket()) {
+      packetName = "ICMP";
+    }else {
       return false;
     }
     setupDataToDrillTable(new PacketDto(packetName, networkType, packet));
@@ -237,10 +241,18 @@ public class PcapRecordReader extends AbstractRecordReader {
           setIntegerColumnValue(packet.getNetwork(), pci);
           break;
         case "dst_ip":
-          setStringColumnValue(packet.getIp().getDst_ip().getHostAddress(), pci);
+          if (packet.getIp() != null) {
+            setStringColumnValue(packet.getIp().getDst_ip().getHostAddress(), pci);
+          } else {
+            setStringColumnValue("", pci);
+          }
           break;
         case "src_ip":
-          setStringColumnValue(packet.getIp().getSrc_ip().getHostAddress(), pci);
+          if (packet.getIp() != null) {
+            setStringColumnValue(packet.getIp().getSrc_ip().getHostAddress(), pci);
+          } else {
+            setStringColumnValue("", pci);
+          }
           break;
         case "src_port":
           setIntegerColumnValue(packet.getSrc_port(), pci);
