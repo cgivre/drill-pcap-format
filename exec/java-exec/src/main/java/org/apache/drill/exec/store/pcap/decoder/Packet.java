@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.drill.exec.store.pcap.decoder;
 
 import com.google.common.base.Preconditions;
@@ -43,12 +60,10 @@ public class Packet {
     }
 
     public int decodePcap(final byte[] buffer, final int offset) {
-        int pcapOffset = offset;
-
         raw = buffer;
         etherOffset = offset + PCAP_HEADER_SIZE;
 
-        pcapHeader = Arrays.copyOfRange(raw, pcapOffset, etherOffset);
+        pcapHeader = Arrays.copyOfRange(raw, offset, etherOffset);
         int originalLength = decodePcapHeader();
 
         byte[] packet = Arrays.copyOfRange(raw, etherOffset, packetLength + etherOffset);
@@ -67,10 +82,10 @@ public class Packet {
     private void decodeEtherPacket(byte[] packet) {
         etherProtocol = decoder.getShort(packet, PACKET_PROTOCOL_OFFSET);
         ipOffset = etherOffset + IP_OFFSET;
-        int ipVersion;
+        //int ipVersion;
         if (isIpV4Packet()) {
             Preconditions.checkState(ipVersion() == 4, "Should have seen IP version 4, got %d", ipVersion());
-            ipVersion = 4;
+            //ipVersion = 4;
 
             int n = ipV4HeaderLength();
             Preconditions.checkState(n >= 20 && n < 200, "Invalid header length: ", n);
@@ -81,7 +96,7 @@ public class Packet {
             IpDto = getIPFromPacket(packet);
         } else if (isIpV6Packet()) {
             Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
-            ipVersion = 6;
+            //ipVersion = 6;
 
             int headerLength = 40;
             int nextHeader = raw[ipOffset + 6] & 0xff;
@@ -134,16 +149,16 @@ public class Packet {
         final int inTCPHeaderSrcPortOffset = 0;
         final int inTCPHeaderDstPortOffset = 2;
 
-        int srcPortOffset = etherHeaderLength +
+        int srcPortOffset = ETHER_HEADER_LENGTH +
                 ipV4HeaderLength() + inTCPHeaderSrcPortOffset;
         this.src_port = convertShort(packet, srcPortOffset);
 
-        int dstPortOffset = etherHeaderLength +
+        int dstPortOffset = ETHER_HEADER_LENGTH +
                 ipV4HeaderLength() + inTCPHeaderDstPortOffset;
         this.dst_port = this.convertShort(packet, dstPortOffset);
 
 
-        int payloadDataStart = etherHeaderLength +
+        int payloadDataStart = ETHER_HEADER_LENGTH +
                 getIPHeaderLength(packet) + this.getTCPHeaderLength(packet);
         byte[] data = new byte[0];
         if ((packet.length - payloadDataStart) > 0) {
@@ -157,15 +172,15 @@ public class Packet {
         final int inUDPHeaderSrcPortOffset = 0;
         final int inUDPHeaderDstPortOffset = 2;
 
-        int srcPortOffset = etherHeaderLength +
+        int srcPortOffset = ETHER_HEADER_LENGTH +
                 ipV4HeaderLength() + inUDPHeaderSrcPortOffset;
         this.src_port = this.convertShort(packet, srcPortOffset);
 
-        int dstPortOffset = etherHeaderLength +
+        int dstPortOffset = ETHER_HEADER_LENGTH +
                 ipV4HeaderLength() + inUDPHeaderDstPortOffset;
         this.dst_port = this.convertShort(packet, dstPortOffset);
 
-        int payloadDataStart = etherHeaderLength +
+        int payloadDataStart = ETHER_HEADER_LENGTH +
                 ipV4HeaderLength() + UDP_HEADER_LENGTH;
         byte[] data = new byte[0];
         if ((packet.length - payloadDataStart) > 0) {
@@ -205,7 +220,7 @@ public class Packet {
     private int getTCPHeaderLength(final byte[] packet) {
         final int inTCPHeaderDataOffset = 12;
 
-        int dataOffset = etherHeaderLength +
+        int dataOffset = ETHER_HEADER_LENGTH +
                 getIPHeaderLength(packet) + inTCPHeaderDataOffset;
         return ((packet[dataOffset] >> 4) & 0xF) * 4;
     }

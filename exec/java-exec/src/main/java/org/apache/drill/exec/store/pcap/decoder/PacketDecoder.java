@@ -83,9 +83,9 @@ public class PacketDecoder {
     network = getIntFileOrder(globalHeader, 20);
   }
 
-  public int decodePacket(final byte[] buffer, final int offset, Packet p) {
-    return p.decodePcap(buffer, offset);
-  }
+//  public int decodePacket(final byte[] buffer, final int offset, Packet p) {
+//    return p.decodePcap(buffer, offset);
+//  }
 
   public Packet packet() {
     return new Packet();
