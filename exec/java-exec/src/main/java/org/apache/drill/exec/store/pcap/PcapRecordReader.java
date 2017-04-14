@@ -31,7 +31,7 @@ import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
-import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
+import org.apache.drill.exec.store.pcap.decoder.Packet;
 import org.apache.drill.exec.store.pcap.dto.ColumnDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
@@ -53,7 +53,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class PcapRecordReader extends AbstractRecordReader {
 
   private OutputMutator output;
-  private OperatorContext context;
 
   private final PacketDecoder decoder;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
@@ -93,7 +92,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   @Override
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.output = output;
-    this.context = context;
+    OperatorContext context1 = context;
   }
 
   @Override
