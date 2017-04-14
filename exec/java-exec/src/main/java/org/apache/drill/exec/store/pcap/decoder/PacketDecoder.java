@@ -20,11 +20,11 @@ package org.apache.drill.exec.store.pcap.decoder;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Shorts;
-import org.apache.drill.exec.store.pcap.dto.IpDto;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 
 public class PacketDecoder {
@@ -55,12 +55,12 @@ public class PacketDecoder {
   //  network: link-layer header type, specifying the type of headers at the beginning of the packet (e.g.
   //     1 for Ethernet, see tcpdump.org's link-layer header types page for details); this can be various
   //     types such as 802.11, 802.11 with various radio information, PPP, Token Ring, FDDI, etc.
-  public static final int GLOBAL_HEADER_SIZE = 24;
+  private static final int GLOBAL_HEADER_SIZE = 24;
   private static final int PCAP_MAGIC_LITTLE_ENDIAN = 0xD4C3B2A1;
-  public final byte[] globalHeader = new byte[GLOBAL_HEADER_SIZE];
-  public static final int PCAP_MAGIC_NUMBER = 0xA1B2C3D4;
+  private final byte[] globalHeader = new byte[GLOBAL_HEADER_SIZE];
+  private static final int PCAP_MAGIC_NUMBER = 0xA1B2C3D4;
 
-  public static final int etherHeaderLength = 14;
+  private static final int etherHeaderLength = 14;
   public static final int etherTypeOffset = 12;
   public static final int etherTypeIP = 0x800;
 
@@ -72,7 +72,10 @@ public class PacketDecoder {
 
   public PacketDecoder(final InputStream input) throws IOException {
     this.input = input;
-    input.read(globalHeader);
+    int n = input.read(globalHeader);
+    if (n != globalHeader.length) {
+      throw new IOException("Can't read PCAP file header");
+    }
     switch (getInt(globalHeader, 0)) {
       case PCAP_MAGIC_NUMBER:
         bigEndian = true;
@@ -81,6 +84,7 @@ public class PacketDecoder {
         bigEndian = false;
         break;
       default:
+        //noinspection ConstantConditions
         Preconditions.checkState(false, String.format("Bad magic number = %08x", getIntFileOrder(globalHeader, 0)));
     }
     Preconditions.checkState(getShortFileOrder(globalHeader, 4) == 2, "Wanted major version == 2");
@@ -96,7 +100,7 @@ public class PacketDecoder {
     return new Packet();
   }
 
-  public int getIntFileOrder(final byte[] buf, final int offset) {
+  private int getIntFileOrder(final byte[] buf, final int offset) {
     if (bigEndian) {
       return Ints.fromBytes(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
     } else {
@@ -104,7 +108,7 @@ public class PacketDecoder {
     }
   }
 
-  public int getShortFileOrder(final byte[] buf, final int offset) {
+  private int getShortFileOrder(final byte[] buf, @SuppressWarnings("SameParameterValue") final int offset) {
     if (bigEndian) {
       return Shorts.fromBytes(buf[offset], buf[offset + 1]);
     } else {
@@ -163,8 +167,11 @@ public class PacketDecoder {
 
     private static final int IP_OFFSET = 14;
 
-    private static final int IP_SRC_OFFSET = 26;
-    private static final int IP_DST_OFFSET = 30;
+    private static final int IP4_SRC_OFFSET = IP_OFFSET + 12;
+    private static final int IP4_DST_OFFSET = IP_OFFSET + 16;
+
+    private static final int IP6_SRC_OFFSET = IP_OFFSET + 8;
+    private static final int IP6_DST_OFFSET = IP_OFFSET + 24;
 
     private long timestamp;
 
@@ -178,7 +185,8 @@ public class PacketDecoder {
 
     int payloadOffset;
 
-    private IpDto IpDto;
+    private InetAddress src_ip;
+    private InetAddress dst_ip;
 
     private int src_port;
     private int dst_port;
@@ -188,6 +196,7 @@ public class PacketDecoder {
     private int etherProtocol;
     private int protocol;
 
+    @SuppressWarnings("WeakerAccess")
     public int decodePcap(final byte[] buffer, final int offset) {
       pcapOffset = offset;
 
@@ -206,7 +215,7 @@ public class PacketDecoder {
       timestamp = getIntFileOrder(pcapHeader, TIMESTAMP_OFFSET) * 1000L + getIntFileOrder(pcapHeader, TIMESTAMP_MICRO_OFFSET) / 1000L;
       int originalLength = getIntFileOrder(pcapHeader, ORIGINAL_LENGTH_OFFSET);
       Preconditions.checkState(originalLength < maxLength, "Packet too long (%d bytes)", originalLength);
-      packetLength = getIntFileOrder(pcapHeader,   ACTUAL_LENGTH_OFFSET);
+      packetLength = getIntFileOrder(pcapHeader, ACTUAL_LENGTH_OFFSET);
       return originalLength;
     }
 
@@ -223,7 +232,6 @@ public class PacketDecoder {
 //        Preconditions.checkState(getShort(raw, ipOffset + 6) == 0, "Don't support IP fragmentation yet");
 
         protocol = getByte(raw, ipOffset + 9);
-        IpDto = getIPFromPacket(packet);
       } else if (isIpV6Packet()) {
         Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
         ipVersion = 6;
@@ -251,13 +259,16 @@ public class PacketDecoder {
             case AUTHENTICATION_V6:
               break;
             case ENCAPSULATING_SECURITY_V6:
+              //noinspection ConstantConditions
               Preconditions.checkState(false, "Can't handle ENCAPSULATING_SECURITY extension");
               break;
             case MOBILITY_EXTENSION_V6:
+              //noinspection ConstantConditions
               Preconditions.checkState(false, "Can't handle ENCAPSULATING_SECURITY extension");
               break;
             default:
               protocol = getByte(raw, ipOffset + headerLength);
+              //noinspection ConstantConditions
               Preconditions.checkState(false, "Unknown V6 extension or protocol: ", nextHeader);
               break;
           }
@@ -265,7 +276,6 @@ public class PacketDecoder {
         if (nextHeader != NO_NEXT_HEADER) {
           payloadOffset = ipOffset + headerLength;
         }
-        IpDto = getIPFromPacket(packet);
         protocol = nextHeader;
       }
       if (isTcpPacket()) {
@@ -320,29 +330,6 @@ public class PacketDecoder {
       this.data = data;
     }
 
-    private IpDto getIPFromPacket(final byte[] packet) {
-      InetAddress src_ip;
-      InetAddress dst_ip;
-      byte[] srcIP = new byte[4];
-      System.arraycopy(packet, IP_SRC_OFFSET,
-          srcIP, 0, srcIP.length);
-      try {
-        src_ip = InetAddress.getByAddress(srcIP);
-      } catch (Exception e) {
-        throw new RuntimeException("Source IP in packet is broke");
-      }
-
-      byte[] dstIP = new byte[4];
-      System.arraycopy(packet, IP_DST_OFFSET,
-          dstIP, 0, dstIP.length);
-      try {
-        dst_ip = InetAddress.getByAddress(dstIP);
-      } catch (Exception e) {
-        throw new RuntimeException("Destination IP in packet is broke");
-      }
-      return new IpDto(src_ip, dst_ip);
-    }
-
     private int getIPHeaderLength(final byte[] packet) {
       return (packet[VER_IHL_OFFSET] & 0xF) * 4;
     }
@@ -373,10 +360,12 @@ public class PacketDecoder {
       return getByte(raw, ipOffset) >>> 4;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isIpV4Packet() {
       return etherProtocol == 0x800;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isIpV6Packet() {
       return etherProtocol == 0x86dd;
     }
@@ -409,16 +398,41 @@ public class PacketDecoder {
       return src_port;
     }
 
+    public InetAddress getSrc_ip() {
+      return getIPAddress(true);
+    }
+
     public int getDst_port() {
       return dst_port;
     }
 
-    public byte[] getData() {
-      return data;
+    public InetAddress getDst_ip() {
+      return getIPAddress(false);
     }
 
-    public IpDto getIpDto() {
-      return IpDto;
+    private InetAddress getIPAddress(boolean src) {
+      int srcPos;
+      byte[] dstIP;
+      if (isIpV4Packet()) {
+        dstIP = new byte[4];
+        srcPos = src ? IP4_SRC_OFFSET : IP4_DST_OFFSET;
+      } else if (isIpV6Packet()) {
+        dstIP = new byte[16];
+        srcPos = src ? IP6_SRC_OFFSET : IP6_DST_OFFSET;
+      } else {
+        return null;
+      }
+
+      System.arraycopy(raw, srcPos, dstIP, 0, dstIP.length);
+      try {
+        return InetAddress.getByAddress(dstIP);
+      } catch (UnknownHostException e) {
+        return null;
+      }
+    }
+
+    public byte[] getData() {
+      return data;
     }
   }
 }
