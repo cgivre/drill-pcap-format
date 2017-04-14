@@ -128,6 +128,19 @@ public class PacketDecoder {
     return network;
   }
 
+  public boolean isBigEndian() {
+    return bigEndian;
+  }
+
+  public Packet nextPacket() throws IOException {
+    Packet r = new Packet();
+    if (r.readPcap(input)) {
+      return r;
+    } else {
+      return null;
+    }
+  }
+
   public class Packet {
     // pcap header
     //        typedef struct pcaprec_hdr_s {
@@ -187,6 +200,26 @@ public class PacketDecoder {
     private int packetLength;
     private int etherProtocol;
     private int protocol;
+
+    public boolean readPcap(InputStream in) throws IOException {
+      pcapHeader = new byte[PCAP_HEADER_SIZE];
+      pcapOffset = 0;
+      int n = in.read(pcapHeader);
+      if (n < pcapHeader.length) {
+        return false;
+      }
+      int originalLength = decodePcapHeader();
+
+      raw = new byte[originalLength];
+      n = in.read(raw);
+      if (n < 0) {
+        return false;
+      }
+      etherOffset = 0;
+
+      decodeEtherPacket(raw);
+      return true;
+    }
 
     public int decodePcap(final byte[] buffer, final int offset) {
       pcapOffset = offset;
