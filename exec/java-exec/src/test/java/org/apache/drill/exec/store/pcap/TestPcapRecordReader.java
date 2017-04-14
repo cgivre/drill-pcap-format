@@ -40,7 +40,6 @@ import java.util.List;
 import static org.junit.Assert.assertTrue;
 
 public class TestPcapRecordReader extends BaseTestQuery {
-
   /*
   * Added for querying big files
   */
@@ -62,14 +61,12 @@ public class TestPcapRecordReader extends BaseTestQuery {
     runSQLVerifyCount("select distinct * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`", 1);
   }
 
-  private void runSQLVerifyCount(String sql, int expectedRowCount)
-      throws Exception {
+  private void runSQLVerifyCount(String sql, int expectedRowCount) throws Exception {
     List<QueryDataBatch> results = runSQLWithResults(sql);
     printResultAndVerifyRowCount(results, expectedRowCount);
   }
 
-  private List<QueryDataBatch> runSQLWithResults(String sql)
-      throws Exception {
+  private List<QueryDataBatch> runSQLWithResults(String sql) throws Exception {
     return testSqlWithResults(sql);
   }
 
