@@ -99,7 +99,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
     }
   }
 
-  public static void writeHeader(DataOutputStream out) throws IOException {
+  private static void writeHeader(DataOutputStream out) throws IOException {
     //        typedef struct pcap_hdr_s {
     //            guint32 magic_number;   /* magic number */
     //            guint16 version_major;  /* major version number */
@@ -130,7 +130,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
    * <p>
    * Even with decent buffering, this isn't very fast.
    *
-   * @throws IOException
+   * @throws IOException If file can't be read.
    */
   @Test
   public void testConventionalApproach() throws IOException {
@@ -142,7 +142,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
    * <p>
    * Even with decent buffering, this isn't very fast.
    *
-   * @throws IOException
+   * @throws IOException If file can't be read.
    */
   @Test
   public void testBufferedApproach() throws IOException {
@@ -179,7 +179,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
    * Tests speed for in-place decoding. This is enormously faster than creating objects, largely
    * because we rarely have to move any data. Instead, we can examine as it lies in the buffer.
    *
-   * @throws IOException
+   * @throws IOException If file can't be read.
    */
   @Test
   public void testFastApproach() throws IOException {
@@ -231,7 +231,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
   /**
    * Creates an ephemeral file of about a GB in size
    *
-   * @throws IOException
+   * @throws IOException If input file can't be read or output can't be written.
    */
 
   @BeforeClass
@@ -245,7 +245,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
         // might be faster to keep this open and rewind each time, but
         // that is hard to do with a resource, especially if it comes
         // from the class path instead of files.
-        try (InputStream in = Resources.getResource("tcp-2.pcap").openStream()) {
+        try (InputStream in = Resources.getResource("store/pcap/tcp-2.pcap").openStream()) {
           ConcatPcap.copy(first, in, out);
         }
         first = false;
@@ -258,7 +258,7 @@ public class TestPcapRecordReader extends BaseTestQuery {
    * Compares how fast we can read a big file with different size reads. This tells
    * us what changes when we read many packets from the file at once.
    *
-   * @throws IOException
+   * @throws IOException If file can't be read.
    */
   @Test
   public void testBigReads() throws IOException {
