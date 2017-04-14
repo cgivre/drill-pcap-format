@@ -54,7 +54,6 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   private OutputMutator output;
 
-  private final PacketDecoder decoder;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
 
   private byte[] buffer = new byte[100000];
@@ -81,7 +80,6 @@ public class PcapRecordReader extends AbstractRecordReader {
                           final List<SchemaPath> projectedColumns) {
     try {
       this.in = new FileInputStream(getPathToFile(inputPath));
-      this.decoder = getPacketDecoder();
       validBytes = in.read(buffer);
     } catch (IOException e) {
       throw new RuntimeException("File " + getPathToFile(inputPath) + " not Found");
@@ -185,8 +183,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   private int parsePcapFilesAndPutItToTable() throws IOException {
-    Packet packet = decoder.packet();
-    int networkType = decoder.getNetwork();
+    Packet packet = new Packet(getPacketDecoder());
     while (offset < validBytes) {
 
       if (validBytes - offset < 9000) {
@@ -200,9 +197,9 @@ public class PcapRecordReader extends AbstractRecordReader {
         }
       }
 
-      offset = decoder.decodePacket(buffer, offset, packet);
+      offset = packet.decodePcap(buffer, offset);
 
-      if (addDataToTable(packet, networkType)) {
+      if (addDataToTable(packet, getPacketDecoder().getNetwork())) {
         return 1;
       }
     }
