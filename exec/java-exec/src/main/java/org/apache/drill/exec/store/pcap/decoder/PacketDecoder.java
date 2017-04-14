@@ -360,6 +360,20 @@ public class PacketDecoder {
       return getByte(raw, ipOffset) >>> 4;
     }
 
+    public String getPacketType() {
+      if (isTcpPacket()) {
+        return "TCP";
+      } else if (isUdpPacket()) {
+        return "UDP";
+      } else if (isArpPacket()) {
+        return "ARP";
+      } else if (isIcmpPacket()) {
+        return "ICMP";
+      } else {
+        return "unknown";
+      }
+    }
+
     @SuppressWarnings("WeakerAccess")
     public boolean isIpV4Packet() {
       return etherProtocol == 0x800;
@@ -370,18 +384,22 @@ public class PacketDecoder {
       return etherProtocol == 0x86dd;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isTcpPacket() {
       return protocol == TCP_PROTOCOL;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isUdpPacket() {
       return protocol == UDP_PROTOCOL;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isArpPacket() {
       return protocol == ARP_PROTOCOL;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public boolean isIcmpPacket() {
       return protocol == ICMP_PROTOCOL;
     }
