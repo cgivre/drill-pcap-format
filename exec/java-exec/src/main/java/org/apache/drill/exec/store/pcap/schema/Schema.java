@@ -40,6 +40,9 @@ public class Schema {
     columns.add(new ColumnDto("dst_port", PcapTypes.INTEGER));
     columns.add(new ColumnDto("packet_length", PcapTypes.INTEGER));
     columns.add(new ColumnDto("data", PcapTypes.STRING));
+    columns.add(new ColumnDto("source_mac_address",PcapTypes.STRING ));
+    columns.add(new ColumnDto("dest_mac_address",PcapTypes.STRING ));
+
   }
 
   /**

@@ -28,6 +28,8 @@ public class PacketDto {
   private final int dst_port;
   private final byte[] data;
   private final int network;
+  private final String src_mac_address;
+  private final String dest_mac_address;
 
   public PacketDto(String packetName, int networkType, Packet packet) {
     this.packetName = packetName;
@@ -38,6 +40,9 @@ public class PacketDto {
     this.src_port = packet.getSrc_port();
     this.dst_port = packet.getDst_port();
     this.data = packet.getData();
+    this.src_mac_address = packet.getEthernetSource();
+    this.dest_mac_address = packet.getEthernetDestination();
+
   }
 
   public String getPacketName() {
@@ -71,4 +76,8 @@ public class PacketDto {
   public byte[] getData() {
     return data;
   }
+
+  public String getSrc_mac_address() { return src_mac_address; }
+
+  public String getDest_mac_address() { return dest_mac_address; }
 }

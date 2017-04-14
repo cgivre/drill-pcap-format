@@ -343,6 +343,26 @@ public class PacketDecoder {
       return new IpDto(src_ip, dst_ip);
     }
 
+    public String getEthernetSource() {
+      byte[] r = new byte[6];
+      System.arraycopy(raw, 0, r, 0, 6);
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < r.length; i++) {
+        sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
+      }
+      return sb.toString();
+    }
+
+    public String getEthernetDestination() {
+      byte[] r = new byte[6];
+      System.arraycopy(raw, 6, r, 0, 6);
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < r.length; i++) {
+        sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
+      }
+      return sb.toString();
+    }
+
     private int getIPHeaderLength(final byte[] packet) {
       return (packet[VER_IHL_OFFSET] & 0xF) * 4;
     }

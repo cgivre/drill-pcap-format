@@ -240,6 +240,12 @@ public class PcapRecordReader extends AbstractRecordReader {
         case "Network":
           setIntegerColumnValue(packet.getNetwork(), pci);
           break;
+        case "source_mac_address":
+          setStringColumnValue(packet.getSrc_mac_address(), pci);
+          break;
+        case "dest_mac_address":
+          setStringColumnValue(packet.getDest_mac_address(), pci);
+          break;
         case "dst_ip":
           if (packet.getIp() != null) {
             setStringColumnValue(packet.getIp().getDst_ip().getHostAddress(), pci);
@@ -270,6 +276,7 @@ public class PcapRecordReader extends AbstractRecordReader {
             setStringColumnValue("[]", pci);
           }
           break;
+
       }
     }
   }
