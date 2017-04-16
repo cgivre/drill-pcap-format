@@ -28,12 +28,11 @@ import org.junit.rules.TestRule;
 import java.util.List;
 
 public class TestPcapRecordReader extends BaseTestQuery {
-
   /*
   * Added for querying big files
   */
   @Rule
-  public final TestRule TIMEOUT = TestTools.getTimeoutRule(500000); // 500secs
+  public final TestRule TIMEOUT = TestTools.getTimeoutRule(50000); // 50secs
 
   @Test
   public void testStarQuery() throws Exception {
@@ -50,14 +49,12 @@ public class TestPcapRecordReader extends BaseTestQuery {
     runSQLVerifyCount("select distinct * from dfs.`${WORKING_PATH}/src/test/resources/store/pcap/tcp-1.pcap`", 1);
   }
 
-  private void runSQLVerifyCount(String sql, int expectedRowCount)
-      throws Exception {
+  private void runSQLVerifyCount(String sql, int expectedRowCount) throws Exception {
     List<QueryDataBatch> results = runSQLWithResults(sql);
     printResultAndVerifyRowCount(results, expectedRowCount);
   }
 
-  private List<QueryDataBatch> runSQLWithResults(String sql)
-      throws Exception {
+  private List<QueryDataBatch> runSQLWithResults(String sql) throws Exception {
     return testSqlWithResults(sql);
   }
 

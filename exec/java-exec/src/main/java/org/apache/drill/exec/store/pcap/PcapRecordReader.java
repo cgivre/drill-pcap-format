@@ -33,7 +33,6 @@ import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
 import org.apache.drill.exec.store.pcap.dto.ColumnDto;
-import org.apache.drill.exec.store.pcap.dto.PacketDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
 import org.apache.drill.exec.vector.NullableIntVector;
@@ -212,33 +211,16 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   private boolean addDataToTable(final Packet packet, final int networkType) {
-    String packetName;
-    if (packet.isTcpPacket()) {
-      packetName = "TCP";
-    } else if (packet.isUdpPacket()) {
-      packetName = "UDP";
-    } else if (packet.isArpPacket()) {
-      packetName = "ARP";
-    } else if(packet.isIcmpPacket()) {
-      packetName = "ICMP";
-    }else {
-      return false;
-    }
-    setupDataToDrillTable(new PacketDto(packetName, networkType, packet));
-    return true;
-  }
-
-  private void setupDataToDrillTable(final PacketDto packet) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
         case "Type":
-          setStringColumnValue(packet.getPacketName(), pci);
+          setStringColumnValue(packet.getPacketType(), pci);
           break;
         case "Timestamp":
           setTimestampColumnValue(packet.getTimestamp(), pci);
           break;
         case "Network":
-          setIntegerColumnValue(packet.getNetwork(), pci);
+          setIntegerColumnValue(networkType, pci);
           break;
         case "source_mac_address":
           setStringColumnValue(packet.getSrc_mac_address(), pci);
@@ -247,17 +229,17 @@ public class PcapRecordReader extends AbstractRecordReader {
           setStringColumnValue(packet.getDest_mac_address(), pci);
           break;
         case "dst_ip":
-          if (packet.getIp() != null) {
-            setStringColumnValue(packet.getIp().getDst_ip().getHostAddress(), pci);
+          if (packet.getDst_ip() != null) {
+            setStringColumnValue(packet.getDst_ip().getHostAddress(), pci);
           } else {
-            setStringColumnValue("", pci);
+            setStringColumnValue(null, pci);
           }
           break;
         case "src_ip":
-          if (packet.getIp() != null) {
-            setStringColumnValue(packet.getIp().getSrc_ip().getHostAddress(), pci);
+          if (packet.getSrc_ip() != null) {
+            setStringColumnValue(packet.getSrc_ip().getHostAddress(), pci);
           } else {
-            setStringColumnValue("", pci);
+            setStringColumnValue(null, pci);
           }
           break;
         case "src_port":
@@ -273,12 +255,13 @@ public class PcapRecordReader extends AbstractRecordReader {
           if (packet.getData() != null) {
             setStringColumnValue(Arrays.toString(packet.getData()), pci);
           } else {
-            setStringColumnValue("[]", pci);
+            setStringColumnValue(null, pci);
           }
           break;
 
       }
     }
+    return true;
   }
 
   private void setIntegerColumnValue(final int data, final ProjectedColumnInfo pci) {
@@ -292,8 +275,13 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   private void setStringColumnValue(final String data, final ProjectedColumnInfo pci) {
-    ByteBuffer value = ByteBuffer.wrap(data.getBytes(UTF_8));
-    ((NullableVarCharVector.Mutator) pci.vv.getMutator())
-        .setSafe(0, value, 0, value.remaining());
+    if (data == null) {
+      ((NullableVarCharVector.Mutator) pci.vv.getMutator())
+          .setNull(0);
+    } else {
+      ByteBuffer value = ByteBuffer.wrap(data.getBytes(UTF_8));
+      ((NullableVarCharVector.Mutator) pci.vv.getMutator())
+          .setSafe(0, value, 0, value.remaining());
+    }
   }
 }
