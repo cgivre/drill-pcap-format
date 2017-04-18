@@ -213,13 +213,13 @@ public class PcapRecordReader extends AbstractRecordReader {
   private boolean addDataToTable(final Packet packet, final int networkType) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
-        case "Type":
+        case "type":
           setStringColumnValue(packet.getPacketType(), pci);
           break;
-        case "Timestamp":
+        case "timestamp":
           setTimestampColumnValue(packet.getTimestamp(), pci);
           break;
-        case "Network":
+        case "network":
           setIntegerColumnValue(networkType, pci);
           break;
         case "dst_ip":
