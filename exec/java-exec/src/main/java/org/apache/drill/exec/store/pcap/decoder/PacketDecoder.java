@@ -20,7 +20,6 @@ package org.apache.drill.exec.store.pcap.decoder;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Shorts;
-import org.apache.drill.exec.store.pcap.decoder.Packet;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,7 +60,10 @@ public class PacketDecoder {
   private final int network;
   private boolean bigEndian;
 
+  private InputStream input;
+
   public PacketDecoder(final InputStream input) throws IOException {
+    this.input = input;
     byte[] globalHeader = new byte[GLOBAL_HEADER_SIZE];
     int n = input.read(globalHeader);
     if (n != globalHeader.length) {
@@ -83,9 +85,9 @@ public class PacketDecoder {
     network = getIntFileOrder(globalHeader, 20);
   }
 
-//  public int decodePacket(final byte[] buffer, final int offset, Packet p) {
-//    return p.decodePcap(buffer, offset);
-//  }
+  public int decodePacket(final byte[] buffer, final int offset, Packet p) {
+    return p.decodePcap(buffer, offset);
+  }
 
   public Packet packet() {
     return new Packet();
@@ -135,7 +137,6 @@ public class PacketDecoder {
       return null;
     }
   }
-
 
   public int getMaxLength() {
     return maxLength;

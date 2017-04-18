@@ -20,7 +20,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
@@ -30,8 +29,8 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
-import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
 import org.apache.drill.exec.store.pcap.decoder.Packet;
+import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
 import org.apache.drill.exec.store.pcap.dto.ColumnDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
@@ -61,6 +60,8 @@ public class PcapRecordReader extends AbstractRecordReader {
   private InputStream in;
   private int validBytes;
 
+  private final PacketDecoder decoder;
+
   private static final Map<PcapTypes, MinorType> TYPES;
 
   private static class ProjectedColumnInfo {
@@ -69,7 +70,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   static {
-    TYPES = ImmutableMap.<PcapTypes, TypeProtos.MinorType>builder()
+    TYPES = ImmutableMap.<PcapTypes, MinorType>builder()
         .put(PcapTypes.STRING, MinorType.VARCHAR)
         .put(PcapTypes.INTEGER, MinorType.INT)
         .put(PcapTypes.TIMESTAMP, MinorType.TIMESTAMP)
@@ -80,7 +81,8 @@ public class PcapRecordReader extends AbstractRecordReader {
                           final List<SchemaPath> projectedColumns) {
     try {
       this.in = new FileInputStream(getPathToFile(inputPath));
-      validBytes = in.read(buffer);
+      this.decoder = getPacketDecoder();
+      this.validBytes = in.read(buffer);
     } catch (IOException e) {
       throw new RuntimeException("File " + getPathToFile(inputPath) + " not Found");
     }
@@ -90,7 +92,6 @@ public class PcapRecordReader extends AbstractRecordReader {
   @Override
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.output = output;
-    OperatorContext context1 = context;
   }
 
   @Override
@@ -133,7 +134,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
       final String name = column.getColumnName();
       final PcapTypes type = column.getColumnType();
-      TypeProtos.MinorType minorType = TYPES.get(type);
+      MinorType minorType = TYPES.get(type);
 
       ProjectedColumnInfo pci = getProjectedColumnInfo(column, name, minorType);
       pciBuilder.add(pci);
@@ -144,7 +145,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDto column,
                                                      final String name,
                                                      final MinorType minorType) {
-    TypeProtos.MajorType majorType = getMajorType(minorType);
+    MajorType majorType = getMajorType(minorType);
 
     MaterializedField field =
         MaterializedField.create(name, majorType);
@@ -183,7 +184,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   private int parsePcapFilesAndPutItToTable() throws IOException {
-    Packet packet = new Packet(getPacketDecoder());
+    Packet packet = new Packet(decoder);
     while (offset < validBytes) {
 
       if (validBytes - offset < 9000) {
@@ -199,7 +200,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
       offset = packet.decodePcap(buffer, offset);
 
-      if (addDataToTable(packet, getPacketDecoder().getNetwork())) {
+      if (addDataToTable(packet, decoder.getNetwork())) {
         return 1;
       }
     }
@@ -245,7 +246,7 @@ public class PcapRecordReader extends AbstractRecordReader {
           if (packet.getData() != null) {
             setStringColumnValue(Arrays.toString(packet.getData()), pci);
           } else {
-            setStringColumnValue(null, pci);
+            setStringColumnValue("[]", pci);
           }
           break;
       }

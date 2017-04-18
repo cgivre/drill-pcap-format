@@ -18,8 +18,10 @@ package org.apache.drill.exec.store.pcap;
 
 import com.google.common.io.Resources;
 import org.apache.drill.BaseTestQuery;
+import org.apache.drill.exec.store.pcap.decoder.Packet;
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.BufferedInputStream;
@@ -32,6 +34,7 @@ import java.io.InputStream;
 
 import static org.junit.Assert.assertTrue;
 
+@Ignore
 public class TestPcapDecoder extends BaseTestQuery {
   private static File bigFile;
 
@@ -126,7 +129,7 @@ public class TestPcapDecoder extends BaseTestQuery {
 
   private void speedRun(InputStream in, String msg) throws IOException {
     PacketDecoder pd = new PacketDecoder(in);
-    PacketDecoder.Packet p = pd.nextPacket();
+    Packet p = pd.nextPacket();
     long total = 0;
     int tcpCount = 0;
     int udpCount = 0;
@@ -160,7 +163,7 @@ public class TestPcapDecoder extends BaseTestQuery {
   public void testFastApproach() throws IOException {
     InputStream in = new FileInputStream(bigFile);
     PacketDecoder pd = new PacketDecoder(in);
-    PacketDecoder.Packet p = pd.packet();
+    Packet p = pd.packet();
 
     byte[] buffer = new byte[100000];
     int validBytes = in.read(buffer);
