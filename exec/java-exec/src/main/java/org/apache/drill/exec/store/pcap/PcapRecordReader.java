@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
@@ -52,15 +53,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class PcapRecordReader extends AbstractRecordReader {
 
   private OutputMutator output;
+  private OperatorContext context;
 
+  private final PacketDecoder decoder;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
 
   private byte[] buffer = new byte[100000];
   private int offset = 0;
   private InputStream in;
   private int validBytes;
-
-  private final PacketDecoder decoder;
 
   private static final Map<PcapTypes, MinorType> TYPES;
 
@@ -70,7 +71,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   static {
-    TYPES = ImmutableMap.<PcapTypes, MinorType>builder()
+    TYPES = ImmutableMap.<PcapTypes, TypeProtos.MinorType>builder()
         .put(PcapTypes.STRING, MinorType.VARCHAR)
         .put(PcapTypes.INTEGER, MinorType.INT)
         .put(PcapTypes.TIMESTAMP, MinorType.TIMESTAMP)
@@ -82,7 +83,7 @@ public class PcapRecordReader extends AbstractRecordReader {
     try {
       this.in = new FileInputStream(getPathToFile(inputPath));
       this.decoder = getPacketDecoder();
-      this.validBytes = in.read(buffer);
+      validBytes = in.read(buffer);
     } catch (IOException e) {
       throw new RuntimeException("File " + getPathToFile(inputPath) + " not Found");
     }
@@ -92,6 +93,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   @Override
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.output = output;
+    this.context = context;
   }
 
   @Override
@@ -134,7 +136,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
       final String name = column.getColumnName();
       final PcapTypes type = column.getColumnType();
-      MinorType minorType = TYPES.get(type);
+      TypeProtos.MinorType minorType = TYPES.get(type);
 
       ProjectedColumnInfo pci = getProjectedColumnInfo(column, name, minorType);
       pciBuilder.add(pci);
@@ -145,7 +147,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   private ProjectedColumnInfo getProjectedColumnInfo(final ColumnDto column,
                                                      final String name,
                                                      final MinorType minorType) {
-    MajorType majorType = getMajorType(minorType);
+    TypeProtos.MajorType majorType = getMajorType(minorType);
 
     MaterializedField field =
         MaterializedField.create(name, majorType);
@@ -198,7 +200,7 @@ public class PcapRecordReader extends AbstractRecordReader {
         }
       }
 
-      offset = packet.decodePcap(buffer, offset);
+      offset = decoder.decodePacket(buffer, offset, packet);
 
       if (addDataToTable(packet, decoder.getNetwork())) {
         return 1;

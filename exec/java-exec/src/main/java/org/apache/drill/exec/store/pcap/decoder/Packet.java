@@ -60,8 +60,7 @@ public class Packet {
   private int getTCPHeaderLength(final byte[] packet) {
     final int inTCPHeaderDataOffset = 12;
 
-    int dataOffset = PacketDecoder.etherHeaderLength +
-        getIPHeaderLength(packet) + inTCPHeaderDataOffset;
+    int dataOffset = PacketConstants.ETHER_HEADER_LENGTH + getIPHeaderLength(packet) + inTCPHeaderDataOffset;
     return ((packet[dataOffset] >> 4) & 0xF) * 4;
   }
 
@@ -164,7 +163,7 @@ public class Packet {
       return null;
     }
 
-    System.arraycopy(raw, srcPos, dstIP, 0, dstIP.length);
+    System.arraycopy(raw, etherOffset + srcPos, dstIP, 0, dstIP.length);
     try {
       return InetAddress.getByAddress(dstIP);
     } catch (UnknownHostException e) {
@@ -286,16 +285,16 @@ public class Packet {
     final int inTCPHeaderSrcPortOffset = 0;
     final int inTCPHeaderDstPortOffset = 2;
 
-    int srcPortOffset = PacketDecoder.etherHeaderLength +
+    int srcPortOffset = PacketConstants.ETHER_HEADER_LENGTH +
         ipV4HeaderLength() + inTCPHeaderSrcPortOffset;
     this.src_port = convertShort(packet, srcPortOffset);
 
-    int dstPortOffset = PacketDecoder.etherHeaderLength +
+    int dstPortOffset = PacketConstants.ETHER_HEADER_LENGTH +
         ipV4HeaderLength() + inTCPHeaderDstPortOffset;
     this.dst_port = this.convertShort(packet, dstPortOffset);
 
 
-    int payloadDataStart = PacketDecoder.etherHeaderLength +
+    int payloadDataStart = PacketConstants.ETHER_HEADER_LENGTH +
         getIPHeaderLength(packet) + this.getTCPHeaderLength(packet);
     byte[] data = new byte[0];
     if ((packet.length - payloadDataStart) > 0) {
@@ -309,15 +308,15 @@ public class Packet {
     final int inUDPHeaderSrcPortOffset = 0;
     final int inUDPHeaderDstPortOffset = 2;
 
-    int srcPortOffset = PacketDecoder.etherHeaderLength +
+    int srcPortOffset = PacketConstants.ETHER_HEADER_LENGTH +
         ipV4HeaderLength() + inUDPHeaderSrcPortOffset;
     this.src_port = this.convertShort(packet, srcPortOffset);
 
-    int dstPortOffset = PacketDecoder.etherHeaderLength +
+    int dstPortOffset = PacketConstants.ETHER_HEADER_LENGTH +
         ipV4HeaderLength() + inUDPHeaderDstPortOffset;
     this.dst_port = this.convertShort(packet, dstPortOffset);
 
-    int payloadDataStart = PacketDecoder.etherHeaderLength +
+    int payloadDataStart = PacketConstants.ETHER_HEADER_LENGTH +
         ipV4HeaderLength() + PacketConstants.UDP_HEADER_LENGTH;
     byte[] data = new byte[0];
     if ((packet.length - payloadDataStart) > 0) {

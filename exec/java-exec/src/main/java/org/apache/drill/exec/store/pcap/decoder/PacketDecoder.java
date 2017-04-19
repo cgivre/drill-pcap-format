@@ -56,6 +56,7 @@ public class PacketDecoder {
   private static final int PCAP_MAGIC_LITTLE_ENDIAN = 0xD4C3B2A1;
   private static final int PCAP_MAGIC_NUMBER = 0xA1B2C3D4;
 
+
   private final int maxLength;
   private final int network;
   private boolean bigEndian;

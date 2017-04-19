@@ -214,5 +214,7 @@ public class TestPcapDecoder extends BaseTestQuery {
     Packet p = pd.nextPacket();
     assertEquals("FE:00:00:00:00:02", p.getEthernetDestination());
     assertEquals("FE:00:00:00:00:01", p.getEthernetSource());
+    assertEquals("/192.168.0.1", p.getSrc_ip().toString());
+    assertEquals("/192.168.0.2", p.getDst_ip().toString());
   }
 }
