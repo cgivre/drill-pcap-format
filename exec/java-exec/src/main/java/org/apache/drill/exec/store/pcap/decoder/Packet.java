@@ -41,9 +41,6 @@ public class Packet {
 
   private int etherOffset;
   private int ipOffset;
-  private int ipVersion;
-
-  private int payloadOffset;
 
   private int src_port;
   private int dst_port;
@@ -220,7 +217,6 @@ public class Packet {
     ipOffset = etherOffset + PacketConstants.IP_OFFSET;
     if (isIpV4Packet()) {
       Preconditions.checkState(ipVersion() == 4, "Should have seen IP version 4, got %d", ipVersion());
-      ipVersion = 4;
 
       int n = ipV4HeaderLength();
       Preconditions.checkState(n >= 20 && n < 200, "Invalid header length: ", n);
@@ -230,7 +226,6 @@ public class Packet {
       protocol = PacketDecoder.getByte(raw, ipOffset + 9);
     } else if (isIpV6Packet()) {
       Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
-      ipVersion = 6;
 
       int headerLength = 40;
       int nextHeader = raw[ipOffset + 6] & 0xff;
@@ -268,9 +263,6 @@ public class Packet {
             Preconditions.checkState(false, "Unknown V6 extension or protocol: ", nextHeader);
             break;
         }
-      }
-      if (nextHeader != PacketConstants.NO_NEXT_HEADER) {
-        payloadOffset = ipOffset + headerLength;
       }
       protocol = nextHeader;
     }

@@ -53,7 +53,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class PcapRecordReader extends AbstractRecordReader {
 
   private OutputMutator output;
-  private OperatorContext context;
 
   private final PacketDecoder decoder;
   private ImmutableList<ProjectedColumnInfo> projectedCols;
@@ -81,11 +80,11 @@ public class PcapRecordReader extends AbstractRecordReader {
   public PcapRecordReader(final String inputPath,
                           final List<SchemaPath> projectedColumns) {
     try {
-      this.in = new FileInputStream(getPathToFile(inputPath));
+      this.in = new FileInputStream(inputPath);
       this.decoder = getPacketDecoder();
       validBytes = in.read(buffer);
     } catch (IOException e) {
-      throw new RuntimeException("File " + getPathToFile(inputPath) + " not Found");
+      throw new RuntimeException("File " + inputPath + " not Found");
     }
     setColumns(projectedColumns);
   }
@@ -93,7 +92,6 @@ public class PcapRecordReader extends AbstractRecordReader {
   @Override
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.output = output;
-    this.context = context;
   }
 
   @Override
@@ -120,11 +118,6 @@ public class PcapRecordReader extends AbstractRecordReader {
 
   private ImmutableList<ProjectedColumnInfo> getProjectedColsIfItNull() {
     return projectedCols != null ? projectedCols : initCols(new Schema());
-  }
-
-  // TODO: tricky decision, refactor
-  private String getPathToFile(final String path) {
-    return path.substring(5);
   }
 
   private ImmutableList<ProjectedColumnInfo> initCols(final Schema schema) {
