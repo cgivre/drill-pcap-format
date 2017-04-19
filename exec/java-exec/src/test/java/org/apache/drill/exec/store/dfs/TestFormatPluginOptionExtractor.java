@@ -57,6 +57,7 @@ public class TestFormatPluginOptionExtractor {
           assertEquals(d.typeName, "(type: String, autoCorrectCorruptDates: boolean)", d.presentParams());
           break;
         case "json":
+        case "pcap":
         case "sequencefile":
         case "avro":
           assertEquals(d.typeName, "(type: String)", d.presentParams());

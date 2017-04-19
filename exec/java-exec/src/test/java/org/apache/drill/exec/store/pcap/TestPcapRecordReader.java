@@ -17,24 +17,14 @@
 package org.apache.drill.exec.store.pcap;
 
 import org.apache.drill.BaseTestQuery;
-import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestRule;
 
 import java.util.List;
 
-@Ignore
 public class TestPcapRecordReader extends BaseTestQuery {
-  /*
-  * Added for querying big files
-  */
-  @Rule
-  public final TestRule TIMEOUT = TestTools.getTimeoutRule(50000); // 50secs
 
   @Test
   public void testStarQuery() throws Exception {

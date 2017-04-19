@@ -17,8 +17,6 @@
  */
 package org.apache.drill.exec.store.pcap;
 
-import org.junit.Ignore;
-
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -28,7 +26,6 @@ import java.io.InputStream;
  * Concatenates PCAP files. The only trickiness is that we have to skip the
  * 24 byte header on all but the first file.
  */
-@Ignore
 public class ConcatPcap {
   public static void main(String[] args) throws IOException {
     try (DataOutputStream out = new DataOutputStream(System.out)) {
