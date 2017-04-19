@@ -57,7 +57,6 @@ public class PacketDecoder {
   //     types such as 802.11, 802.11 with various radio information, PPP, Token Ring, FDDI, etc.
   private static final int GLOBAL_HEADER_SIZE = 24;
   private static final int PCAP_MAGIC_LITTLE_ENDIAN = 0xD4C3B2A1;
-  private final byte[] globalHeader = new byte[GLOBAL_HEADER_SIZE];
   private static final int PCAP_MAGIC_NUMBER = 0xA1B2C3D4;
 
   private static final int etherHeaderLength = 14;
@@ -72,6 +71,7 @@ public class PacketDecoder {
 
   public PacketDecoder(final InputStream input) throws IOException {
     this.input = input;
+    byte[] globalHeader = new byte[GLOBAL_HEADER_SIZE];
     int n = input.read(globalHeader);
     if (n != globalHeader.length) {
       throw new IOException("Can't read PCAP file header");
@@ -155,6 +155,12 @@ public class PacketDecoder {
     //        } pcaprec_hdr_t;
     private static final int PCAP_HEADER_SIZE = 4 * 4;
 
+    // offsets from beginning of ethernet packet
+    @SuppressWarnings("WeakerAccess")
+    public static final int ETHER_DST_OFFSET = 0;
+    @SuppressWarnings("WeakerAccess")
+    public static final int ETHER_SRC_OFFSET = 6;
+
     private static final int TIMESTAMP_OFFSET = 0;
     private static final int TIMESTAMP_MICRO_OFFSET = 4;
     private static final int ORIGINAL_LENGTH_OFFSET = 8;
@@ -197,9 +203,6 @@ public class PacketDecoder {
     int ipVersion;
 
     int payloadOffset;
-
-    private InetAddress src_ip;
-    private InetAddress dst_ip;
 
     private int src_port;
     private int dst_port;
@@ -364,32 +367,9 @@ public class PacketDecoder {
       this.data = data;
     }
 
-    private IpDto getIPFromPacket(final byte[] packet) {
-      InetAddress src_ip;
-      InetAddress dst_ip;
-      byte[] srcIP = new byte[4];
-      System.arraycopy(packet, IP_SRC_OFFSET,
-          srcIP, 0, srcIP.length);
-      try {
-        src_ip = InetAddress.getByAddress(srcIP);
-      } catch (Exception e) {
-        throw new RuntimeException("Source IP in packet is broke");
-      }
-
-      byte[] dstIP = new byte[4];
-      System.arraycopy(packet, IP_DST_OFFSET,
-          dstIP, 0, dstIP.length);
-      try {
-        dst_ip = InetAddress.getByAddress(dstIP);
-      } catch (Exception e) {
-        throw new RuntimeException("Destination IP in packet is broke");
-      }
-      return new IpDto(src_ip, dst_ip);
-    }
-
     public String getEthernetSource() {
       byte[] r = new byte[6];
-      System.arraycopy(raw, 0, r, 0, 6);
+      System.arraycopy(raw, etherOffset + ETHER_SRC_OFFSET, r, 0, 6);
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < r.length; i++) {
         sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
@@ -399,7 +379,7 @@ public class PacketDecoder {
 
     public String getEthernetDestination() {
       byte[] r = new byte[6];
-      System.arraycopy(raw, 6, r, 0, 6);
+      System.arraycopy(raw, etherOffset + ETHER_DST_OFFSET, r, 0, 6);
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < r.length; i++) {
         sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
@@ -506,21 +486,21 @@ public class PacketDecoder {
     }
 
     private InetAddress getIPAddress(boolean src) {
-      int srcPos;
-      byte[] dstIP;
+      int pos;
+      byte[] ipBuf;
       if (isIpV4Packet()) {
-        dstIP = new byte[4];
-        srcPos = src ? IP4_SRC_OFFSET : IP4_DST_OFFSET;
+        ipBuf = new byte[4];
+        pos = src ? IP4_SRC_OFFSET : IP4_DST_OFFSET;
       } else if (isIpV6Packet()) {
-        dstIP = new byte[16];
-        srcPos = src ? IP6_SRC_OFFSET : IP6_DST_OFFSET;
+        ipBuf = new byte[16];
+        pos = src ? IP6_SRC_OFFSET : IP6_DST_OFFSET;
       } else {
         return null;
       }
 
-      System.arraycopy(raw, srcPos, dstIP, 0, dstIP.length);
+      System.arraycopy(raw, etherOffset + pos, ipBuf, 0, ipBuf.length);
       try {
-        return InetAddress.getByAddress(dstIP);
+        return InetAddress.getByAddress(ipBuf);
       } catch (UnknownHostException e) {
         return null;
       }

@@ -30,6 +30,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestPcapDecoder extends BaseTestQuery {
@@ -203,31 +204,12 @@ public class TestPcapDecoder extends BaseTestQuery {
     System.out.printf("\n\n\n");
   }
 
-  /**
-   * Compares how fast we can read a big file with different size reads. This tells
-   * us what changes when we read many packets from the file at once.
-   *
-   * @throws IOException If file can't be read.
-   */
   @Test
-  public void testBigReads() throws IOException {
-    for (int size : new int[]{50, 100, 200, 500, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000}) {
-      try (InputStream in = new FileInputStream(bigFile)) {
-        long t0 = System.nanoTime();
-        byte[] buf = new byte[size];
-        long total = 0;
-        int foo = 0;
-        int n = in.read(buf);
-        while (n > 0) {
-          foo += buf[3];
-          total += n;
-          n = in.read(buf);
-        }
-        long t1 = System.nanoTime();
-        double t = (t1 - t0) * 1e-9;
-        System.out.printf("%d\t%.1f MB in %.1f s, %.1f MB/s\n", size, total * 1e-6, t, total * 1e-6 / t);
-      }
-    }
-    System.out.flush();
+  public void testMacAddress() throws IOException {
+    InputStream in = Resources.getResource("store/pcap/tcp-2.pcap").openStream();
+    PacketDecoder pd = new PacketDecoder(in);
+    PacketDecoder.Packet p = pd.nextPacket();
+    assertEquals("FE:00:00:00:00:01", p.getEthernetDestination());
+    assertEquals("FE:00:00:00:00:02", p.getEthernetSource());
   }
 }
