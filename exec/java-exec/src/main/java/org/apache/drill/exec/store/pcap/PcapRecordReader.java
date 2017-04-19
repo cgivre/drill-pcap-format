@@ -31,7 +31,7 @@ import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.pcap.decoder.PacketDecoder;
-import org.apache.drill.exec.store.pcap.decoder.PacketDecoder.Packet;
+import org.apache.drill.exec.store.pcap.decoder.Packet;
 import org.apache.drill.exec.store.pcap.dto.ColumnDto;
 import org.apache.drill.exec.store.pcap.schema.PcapTypes;
 import org.apache.drill.exec.store.pcap.schema.Schema;
@@ -186,8 +186,7 @@ public class PcapRecordReader extends AbstractRecordReader {
   }
 
   private int parsePcapFilesAndPutItToTable() throws IOException {
-    Packet packet = decoder.packet();
-    int networkType = decoder.getNetwork();
+    Packet packet = new Packet();
     while (offset < validBytes) {
 
       if (validBytes - offset < 9000) {
@@ -203,7 +202,7 @@ public class PcapRecordReader extends AbstractRecordReader {
 
       offset = decoder.decodePacket(buffer, offset, packet);
 
-      if (addDataToTable(packet, networkType)) {
+      if (addDataToTable(packet, decoder.getNetwork())) {
         return 1;
       }
     }
@@ -213,13 +212,13 @@ public class PcapRecordReader extends AbstractRecordReader {
   private boolean addDataToTable(final Packet packet, final int networkType) {
     for (ProjectedColumnInfo pci : projectedCols) {
       switch (pci.pcapColumn.getColumnName()) {
-        case "Type":
+        case "type":
           setStringColumnValue(packet.getPacketType(), pci);
           break;
-        case "Timestamp":
+        case "timestamp":
           setTimestampColumnValue(packet.getTimestamp(), pci);
           break;
-        case "Network":
+        case "network":
           setIntegerColumnValue(networkType, pci);
           break;
         case "src_mac_address":

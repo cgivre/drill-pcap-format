@@ -21,12 +21,14 @@ import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 
 import java.util.List;
 
+@Ignore
 public class TestPcapRecordReader extends BaseTestQuery {
   /*
   * Added for querying big files

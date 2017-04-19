@@ -23,9 +23,6 @@ import com.google.common.primitives.Shorts;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Arrays;
 
 public class PacketDecoder {
   //  typedef struct pcap_hdr_s {
@@ -59,9 +56,7 @@ public class PacketDecoder {
   private static final int PCAP_MAGIC_LITTLE_ENDIAN = 0xD4C3B2A1;
   private static final int PCAP_MAGIC_NUMBER = 0xA1B2C3D4;
 
-  private static final int etherHeaderLength = 14;
-  public static final int etherTypeOffset = 12;
-  public static final int etherTypeIP = 0x800;
+  static final int etherHeaderLength = 14;
 
   private final int maxLength;
   private final int network;
@@ -85,23 +80,24 @@ public class PacketDecoder {
         break;
       default:
         //noinspection ConstantConditions
-        Preconditions.checkState(false, String.format("Bad magic number = %08x", getIntFileOrder(globalHeader, 0)));
+        Preconditions.checkState(false,
+            String.format("Bad magic number = %08x", getIntFileOrder(bigEndian, globalHeader, 0)));
     }
     Preconditions.checkState(getShortFileOrder(globalHeader, 4) == 2, "Wanted major version == 2");
-    maxLength = getIntFileOrder(globalHeader, 16);
-    network = getIntFileOrder(globalHeader, 20);
+    maxLength = getIntFileOrder(bigEndian, globalHeader, 16);
+    network = getIntFileOrder(bigEndian, globalHeader, 20);
   }
 
   public int decodePacket(final byte[] buffer, final int offset, Packet p) {
-    return p.decodePcap(buffer, offset);
+    return p.decodePcap(buffer, offset, bigEndian, maxLength);
   }
 
   public Packet packet() {
     return new Packet();
   }
 
-  private int getIntFileOrder(final byte[] buf, final int offset) {
-    if (bigEndian) {
+  static int getIntFileOrder(boolean byteOrder, final byte[] buf, final int offset) {
+    if (byteOrder) {
       return Ints.fromBytes(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
     } else {
       return Ints.fromBytes(buf[offset + 3], buf[offset + 2], buf[offset + 1], buf[offset]);
@@ -120,11 +116,11 @@ public class PacketDecoder {
     return Ints.fromBytes(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
   }
 
-  public int getShort(final byte[] buf, final int offset) {
+  public static int getShort(final byte[] buf, final int offset) {
     return 0xffff & Shorts.fromBytes(buf[offset], buf[offset + 1]);
   }
 
-  public int getByte(final byte[] buf, final int offset) {
+  public static int getByte(final byte[] buf, final int offset) {
     return 0xff & buf[offset];
   }
 
@@ -138,376 +134,10 @@ public class PacketDecoder {
 
   public Packet nextPacket() throws IOException {
     Packet r = new Packet();
-    if (r.readPcap(input)) {
+    if (r.readPcap(input, bigEndian, maxLength)) {
       return r;
     } else {
       return null;
-    }
-  }
-
-  public class Packet {
-    // pcap header
-    //        typedef struct pcaprec_hdr_s {
-    //            guint32 ts_sec;         /* timestamp seconds */
-    //            guint32 ts_usec;        /* timestamp microseconds */
-    //            guint32 incl_len;       /* number of octets of packet saved in file */
-    //            guint32 orig_len;       /* actual length of packet */
-    //        } pcaprec_hdr_t;
-    private static final int PCAP_HEADER_SIZE = 4 * 4;
-
-    // offsets from beginning of ethernet packet
-    @SuppressWarnings("WeakerAccess")
-    public static final int ETHER_DST_OFFSET = 0;
-    @SuppressWarnings("WeakerAccess")
-    public static final int ETHER_SRC_OFFSET = 6;
-
-    private static final int TIMESTAMP_OFFSET = 0;
-    private static final int TIMESTAMP_MICRO_OFFSET = 4;
-    private static final int ORIGINAL_LENGTH_OFFSET = 8;
-    private static final int ACTUAL_LENGTH_OFFSET = 12;
-
-    private static final int PACKET_PROTOCOL_OFFSET = 12;
-
-    private static final byte ARP_PROTOCOL = 0;
-    private static final byte ICMP_PROTOCOL = 1;
-    private static final byte TCP_PROTOCOL = 6;
-    private static final byte UDP_PROTOCOL = 17;
-
-    private static final int HOP_BY_HOP_EXTENSION_V6 = 0;
-    private static final int DESTINATION_OPTIONS_V6 = 60;
-    private static final int ROUTING_V6 = 43;
-    private static final int FRAGMENT_V6 = 44;
-    private static final int AUTHENTICATION_V6 = 51;
-    private static final int ENCAPSULATING_SECURITY_V6 = 50;
-    private static final int MOBILITY_EXTENSION_V6 = 135;
-    private static final int NO_NEXT_HEADER = 59;
-    private static final int UDP_HEADER_LENGTH = 8;
-    private static final int VER_IHL_OFFSET = 14;
-
-    private static final int IP_OFFSET = 14;
-
-    private static final int IP4_SRC_OFFSET = IP_OFFSET + 12;
-    private static final int IP4_DST_OFFSET = IP_OFFSET + 16;
-
-    private static final int IP6_SRC_OFFSET = IP_OFFSET + 8;
-    private static final int IP6_DST_OFFSET = IP_OFFSET + 24;
-
-    private long timestamp;
-
-    private byte[] pcapHeader;
-    private int pcapOffset;
-    private byte[] raw;
-
-    int etherOffset;
-    int ipOffset;
-    int ipVersion;
-
-    int payloadOffset;
-
-    private int src_port;
-    private int dst_port;
-    private byte[] data;
-
-    private int packetLength;
-    private int etherProtocol;
-    private int protocol;
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean readPcap(InputStream in) throws IOException {
-      pcapHeader = new byte[PCAP_HEADER_SIZE];
-      pcapOffset = 0;
-      int n = in.read(pcapHeader);
-      if (n < pcapHeader.length) {
-        return false;
-      }
-      int originalLength = decodePcapHeader();
-
-      raw = new byte[originalLength];
-      n = in.read(raw);
-      if (n < 0) {
-        return false;
-      }
-      etherOffset = 0;
-
-      decodeEtherPacket(raw);
-      return true;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public int decodePcap(final byte[] buffer, final int offset) {
-      pcapOffset = offset;
-
-      raw = buffer;
-      etherOffset = offset + PCAP_HEADER_SIZE;
-
-      pcapHeader = Arrays.copyOfRange(raw, pcapOffset, etherOffset);
-      int originalLength = decodePcapHeader();
-
-      byte[] packet = Arrays.copyOfRange(raw, etherOffset, packetLength + etherOffset);
-      decodeEtherPacket(packet);
-      return offset + PCAP_HEADER_SIZE + originalLength;
-    }
-
-    private int decodePcapHeader() {
-      timestamp = getIntFileOrder(pcapHeader, TIMESTAMP_OFFSET) * 1000L + getIntFileOrder(pcapHeader, TIMESTAMP_MICRO_OFFSET) / 1000L;
-      int originalLength = getIntFileOrder(pcapHeader, ORIGINAL_LENGTH_OFFSET);
-      Preconditions.checkState(originalLength < maxLength, "Packet too long (%d bytes)", originalLength);
-      packetLength = getIntFileOrder(pcapHeader, ACTUAL_LENGTH_OFFSET);
-      return originalLength;
-    }
-
-    private void decodeEtherPacket(byte[] packet) {
-      etherProtocol = getShort(packet, PACKET_PROTOCOL_OFFSET);
-      ipOffset = etherOffset + IP_OFFSET;
-      if (isIpV4Packet()) {
-        Preconditions.checkState(ipVersion() == 4, "Should have seen IP version 4, got %d", ipVersion());
-        ipVersion = 4;
-
-        int n = ipV4HeaderLength();
-        Preconditions.checkState(n >= 20 && n < 200, "Invalid header length: ", n);
-
-//        Preconditions.checkState(getShort(raw, ipOffset + 6) == 0, "Don't support IP fragmentation yet");
-
-        protocol = getByte(raw, ipOffset + 9);
-      } else if (isIpV6Packet()) {
-        Preconditions.checkState(ipVersion() == 6, "Should have seen IP version 6, got %d", ipVersion());
-        ipVersion = 6;
-
-        int headerLength = 40;
-        int nextHeader = raw[ipOffset + 6] & 0xff;
-        while (nextHeader != TCP_PROTOCOL && nextHeader != UDP_PROTOCOL && nextHeader != NO_NEXT_HEADER) {
-          switch (nextHeader) {
-            case HOP_BY_HOP_EXTENSION_V6:
-              nextHeader = getByte(raw, ipOffset + headerLength);
-              headerLength += (getByte(raw, ipOffset + headerLength) + 1) * 8;
-              break;
-            case DESTINATION_OPTIONS_V6:
-              nextHeader = getByte(raw, ipOffset + headerLength);
-              headerLength += (getByte(raw, ipOffset + headerLength) + 1) * 8;
-              break;
-            case ROUTING_V6:
-              nextHeader = getByte(raw, ipOffset + headerLength);
-              headerLength += (getByte(raw, ipOffset + headerLength) + 1) * 8;
-              break;
-            case FRAGMENT_V6:
-              nextHeader = getByte(raw, ipOffset + headerLength);
-              headerLength += 8;
-              break;
-            case AUTHENTICATION_V6:
-              break;
-            case ENCAPSULATING_SECURITY_V6:
-              //noinspection ConstantConditions
-              Preconditions.checkState(false, "Can't handle ENCAPSULATING_SECURITY extension");
-              break;
-            case MOBILITY_EXTENSION_V6:
-              //noinspection ConstantConditions
-              Preconditions.checkState(false, "Can't handle ENCAPSULATING_SECURITY extension");
-              break;
-            default:
-              protocol = getByte(raw, ipOffset + headerLength);
-              //noinspection ConstantConditions
-              Preconditions.checkState(false, "Unknown V6 extension or protocol: ", nextHeader);
-              break;
-          }
-        }
-        if (nextHeader != NO_NEXT_HEADER) {
-          payloadOffset = ipOffset + headerLength;
-        }
-        protocol = nextHeader;
-      }
-      if (isTcpPacket()) {
-        buildTCPPacket(packet);
-      } else if (isUdpPacket()) {
-        buildUDPPacket(packet);
-      }
-    }
-
-    private void buildTCPPacket(final byte[] packet) {
-      final int inTCPHeaderSrcPortOffset = 0;
-      final int inTCPHeaderDstPortOffset = 2;
-
-      int srcPortOffset = etherHeaderLength +
-          ipV4HeaderLength() + inTCPHeaderSrcPortOffset;
-      this.src_port = convertShort(packet, srcPortOffset);
-
-      int dstPortOffset = etherHeaderLength +
-          ipV4HeaderLength() + inTCPHeaderDstPortOffset;
-      this.dst_port = this.convertShort(packet, dstPortOffset);
-
-
-      int payloadDataStart = etherHeaderLength +
-          getIPHeaderLength(packet) + this.getTCPHeaderLength(packet);
-      byte[] data = new byte[0];
-      if ((packet.length - payloadDataStart) > 0) {
-        data = new byte[packet.length - payloadDataStart];
-        System.arraycopy(packet, payloadDataStart, data, 0, data.length);
-      }
-      this.data = data;
-    }
-
-    private void buildUDPPacket(final byte[] packet) {
-      final int inUDPHeaderSrcPortOffset = 0;
-      final int inUDPHeaderDstPortOffset = 2;
-
-      int srcPortOffset = etherHeaderLength +
-          ipV4HeaderLength() + inUDPHeaderSrcPortOffset;
-      this.src_port = this.convertShort(packet, srcPortOffset);
-
-      int dstPortOffset = etherHeaderLength +
-          ipV4HeaderLength() + inUDPHeaderDstPortOffset;
-      this.dst_port = this.convertShort(packet, dstPortOffset);
-
-      int payloadDataStart = etherHeaderLength +
-          ipV4HeaderLength() + UDP_HEADER_LENGTH;
-      byte[] data = new byte[0];
-      if ((packet.length - payloadDataStart) > 0) {
-        data = new byte[packet.length - payloadDataStart];
-        System.arraycopy(packet, payloadDataStart, data, 0, data.length);
-      }
-      this.data = data;
-    }
-
-    public String getEthernetSource() {
-      byte[] r = new byte[6];
-      System.arraycopy(raw, etherOffset + ETHER_SRC_OFFSET, r, 0, 6);
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < r.length; i++) {
-        sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
-      }
-      return sb.toString();
-    }
-
-    public String getEthernetDestination() {
-      byte[] r = new byte[6];
-      System.arraycopy(raw, etherOffset + ETHER_DST_OFFSET, r, 0, 6);
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < r.length; i++) {
-        sb.append(String.format("%02X%s", r[i], (i < r.length - 1) ? ":" : ""));
-      }
-      return sb.toString();
-    }
-
-    private int getIPHeaderLength(final byte[] packet) {
-      return (packet[VER_IHL_OFFSET] & 0xF) * 4;
-    }
-
-    private int getTCPHeaderLength(final byte[] packet) {
-      final int inTCPHeaderDataOffset = 12;
-
-      int dataOffset = etherHeaderLength +
-          getIPHeaderLength(packet) + inTCPHeaderDataOffset;
-      return ((packet[dataOffset] >> 4) & 0xF) * 4;
-    }
-
-    private int convertShort(final byte[] data) {
-      return ((data[0] & 0xFF) << 8) | (data[1] & 0xFF);
-    }
-
-    private int convertShort(final byte[] data, int offset) {
-      byte[] target = new byte[2];
-      System.arraycopy(data, offset, target, 0, target.length);
-      return this.convertShort(target);
-    }
-
-    private int ipV4HeaderLength() {
-      return (getByte(raw, ipOffset) & 0xf) * 4;
-    }
-
-    private int ipVersion() {
-      return getByte(raw, ipOffset) >>> 4;
-    }
-
-    public String getPacketType() {
-      if (isTcpPacket()) {
-        return "TCP";
-      } else if (isUdpPacket()) {
-        return "UDP";
-      } else if (isArpPacket()) {
-        return "ARP";
-      } else if (isIcmpPacket()) {
-        return "ICMP";
-      } else {
-        return "unknown";
-      }
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isIpV4Packet() {
-      return etherProtocol == 0x800;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isIpV6Packet() {
-      return etherProtocol == 0x86dd;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isTcpPacket() {
-      return protocol == TCP_PROTOCOL;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isUdpPacket() {
-      return protocol == UDP_PROTOCOL;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isArpPacket() {
-      return protocol == ARP_PROTOCOL;
-    }
-
-    @SuppressWarnings("WeakerAccess")
-    public boolean isIcmpPacket() {
-      return protocol == ICMP_PROTOCOL;
-    }
-
-    public int getPacketLength() {
-      return packetLength;
-    }
-
-    public long getTimestamp() {
-      return timestamp;
-    }
-
-    public int getSrc_port() {
-      return src_port;
-    }
-
-    public InetAddress getSrc_ip() {
-      return getIPAddress(true);
-    }
-
-    public int getDst_port() {
-      return dst_port;
-    }
-
-    public InetAddress getDst_ip() {
-      return getIPAddress(false);
-    }
-
-    private InetAddress getIPAddress(boolean src) {
-      int pos;
-      byte[] ipBuf;
-      if (isIpV4Packet()) {
-        ipBuf = new byte[4];
-        pos = src ? IP4_SRC_OFFSET : IP4_DST_OFFSET;
-      } else if (isIpV6Packet()) {
-        ipBuf = new byte[16];
-        pos = src ? IP6_SRC_OFFSET : IP6_DST_OFFSET;
-      } else {
-        return null;
-      }
-
-      System.arraycopy(raw, etherOffset + pos, ipBuf, 0, ipBuf.length);
-      try {
-        return InetAddress.getByAddress(ipBuf);
-      } catch (UnknownHostException e) {
-        return null;
-      }
-    }
-
-    public byte[] getData() {
-      return data;
     }
   }
 }
