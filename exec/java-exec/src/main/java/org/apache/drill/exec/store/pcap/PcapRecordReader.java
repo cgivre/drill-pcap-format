@@ -44,7 +44,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -245,7 +244,7 @@ public class PcapRecordReader extends AbstractRecordReader {
           break;
         case "data":
           if (packet.getData() != null) {
-            setStringColumnValue(Arrays.toString(packet.getData()), pci);
+            setStringColumnValue(parseBytesToASCII(packet.getData()), pci);
           } else {
             setStringColumnValue("[]", pci);
           }
@@ -253,6 +252,11 @@ public class PcapRecordReader extends AbstractRecordReader {
       }
     }
     return true;
+  }
+
+  private String parseBytesToASCII(byte[] data) {
+    return new String(data).trim()
+        .replaceAll("\\P{Print}", ".");
   }
 
   private void setIntegerColumnValue(final int data, final ProjectedColumnInfo pci) {
