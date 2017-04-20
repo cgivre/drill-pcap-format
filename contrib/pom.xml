@@ -38,7 +38,6 @@
     <module>storage-mongo</module>
     <module>storage-jdbc</module>
     <module>storage-kudu</module>
-    <module>storage-opentsdb</module>
     <module>sqlline</module>
     <module>data</module>
     <module>gis</module>
