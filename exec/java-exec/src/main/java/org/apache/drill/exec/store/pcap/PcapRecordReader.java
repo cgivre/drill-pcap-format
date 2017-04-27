@@ -236,6 +236,12 @@ public class PcapRecordReader extends AbstractRecordReader {
         case "src_port":
           setIntegerColumnValue(packet.getSrc_port(), pci);
           break;
+        case "ip_protocol":
+          setStringColumnValue(PcapHelperFunctions.getProtocolName(packet.getProtocol()), pci);
+          break;
+        case "ip_protocol_description":
+          setStringColumnValue(PcapHelperFunctions.getProtocolDescription(packet.getProtocol()), pci);
+          break;
         case "dst_port":
           setIntegerColumnValue(packet.getDst_port(), pci);
           break;

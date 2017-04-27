@@ -127,6 +127,8 @@ public class Packet {
     return packetLength;
   }
 
+  public int getProtocol() { return protocol; }
+
   public long getTimestamp() {
     return timestamp;
   }
